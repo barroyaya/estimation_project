@@ -1,0 +1,593 @@
+{#template/client/sablage_tuyuterie.html#}
+{% extends 'base.html' %}
+
+{% block title %}Sablage Tuyauterie - {{ projet.nom }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sablage-header {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: var(--radius-xl);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .sablage-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        transform: translate(50px, -50px);
+    }
+
+    .input-section {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--shadow-md);
+    }
+
+    .preview-section {
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(40, 167, 69, 0.05) 100%);
+        border: 1px solid rgba(40, 167, 69, 0.2);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .elements-list {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--radius-lg);
+        padding: 0;
+        margin-bottom: 2rem;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+    }
+
+    .elements-header {
+        background: var(--success-gradient);
+        color: white;
+        padding: 1.5rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .element-item {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: between;
+    }
+
+    .element-item:hover {
+        background: rgba(102, 126, 234, 0.05);
+        transform: translateX(5px);
+    }
+
+    .element-item:last-child {
+        border-bottom: none;
+    }
+
+    .element-details {
+        flex: 1;
+    }
+
+    .element-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .element-specs {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .element-surface {
+        background: rgba(102, 126, 234, 0.1);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        text-align: center;
+        min-width: 120px;
+        margin-right: 1rem;
+    }
+
+    .surface-value {
+        font-weight: 700;
+        color: var(--primary);
+        font-size: 1.1rem;
+    }
+
+    .btn-remove {
+        background: var(--danger-gradient);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .btn-remove:hover {
+        transform: scale(1.1);
+        box-shadow: var(--shadow-md);
+    }
+
+    .total-section {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        text-align: center;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .total-surface {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .total-price {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 1rem 0;
+    }
+
+    .form-control-modern {
+        border: 2px solid rgba(102, 126, 234, 0.2);
+        border-radius: var(--radius-md);
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.9);
+    }
+
+    .form-control-modern:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background: white;
+    }
+
+    .btn-modern {
+        padding: 0.75rem 1.5rem;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .btn-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .alert-preview {
+        border: none;
+        border-radius: var(--radius-md);
+        padding: 1rem 1.5rem;
+    }
+
+    .calculation-info {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        margin-top: 1rem;
+        border-left: 4px solid var(--info);
+    }
+
+    @media (max-width: 768px) {
+        .element-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .element-surface {
+            margin-right: 0;
+            margin-bottom: 1rem;
+        }
+
+        .total-section {
+            padding: 1.5rem;
+        }
+
+        .total-surface {
+            font-size: 1.5rem;
+        }
+
+        .total-price {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête -->
+<div class="sablage-header">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0" style="background: transparent;">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}" class="text-white-50">Accueil</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'project_selection' %}" class="text-white-50">Projets</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'category_selection' %}" class="text-white-50">{{ projet.nom }}</a></li>
+            <li class="breadcrumb-item active text-white">Sablage Tuyauterie</li>
+        </ol>
+    </nav>
+    <h1 class="mb-3">
+        <i class="fas fa-spray-can me-3"></i>
+        Sablage Tuyauterie
+    </h1>
+    <p class="mb-0 opacity-75">
+        Calcul de surface pour sablage - Projet: <strong>{{ projet.nom }}</strong>
+        {% if projet.client %} - Client: <strong>{{ projet.client }}</strong>{% endif %}
+    </p>
+</div>
+
+<!-- Section d'ajout d'éléments -->
+<div class="input-section">
+    <h4 class="mb-4">
+        <i class="fas fa-plus-circle me-2"></i>
+        Ajouter un élément de sablage
+    </h4>
+    
+    <form method="post" id="sablageForm">
+        {% csrf_token %}
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label for="type_piece" class="form-label">Type de pièce *</label>
+                <select class="form-control-modern" id="type_piece" name="type_piece" required>
+                    <option value="">-- Sélectionner --</option>
+                    {% for value, label in types_pieces %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <label for="dn" class="form-label">Diamètre (DN) *</label>
+                <select class="form-control-modern" id="dn" name="dn" required>
+                    <option value="">-- Sélectionner --</option>
+                    {% for value, label in dn_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <label for="quantite" class="form-label">Quantité *</label>
+                <input type="number" class="form-control-modern" id="quantite" name="quantite" 
+                       step="0.01" min="0.01" value="1" required>
+            </div>
+            
+            <div class="col-md-3 mb-3 d-flex align-items-end">
+                <button type="submit" name="ajouter_element" class="btn btn-success btn-modern w-100">
+                    <i class="fas fa-plus me-2"></i>Ajouter
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Aperçu en temps réel -->
+    <div class="preview-section" id="preview" style="display: none;">
+        <h6 class="text-success mb-3">
+            <i class="fas fa-eye me-2"></i>Aperçu du calcul
+        </h6>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="alert alert-light alert-preview mb-0">
+                    <strong>Surface unitaire:</strong> <span id="preview-su">0</span> m²
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="alert alert-success alert-preview mb-0">
+                    <strong>Surface totale:</strong> <span id="preview-st">0</span> m²
+                </div>
+            </div>
+        </div>
+        <div class="calculation-info">
+            <small class="text-muted">
+                <i class="fas fa-calculator me-1"></i>
+                Calcul: Quantité × Surface unitaire = Surface totale
+            </small>
+        </div>
+    </div>
+</div>
+
+<!-- Liste des éléments ajoutés -->
+{% if elements_sablage %}
+<div class="elements-list">
+    <div class="elements-header">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>
+            Éléments de sablage sélectionnés ({{ nb_elements }})
+        </h5>
+        <span class="badge bg-light text-dark">
+            Surface totale: {{ surface_globale|floatformat:3 }} m²
+        </span>
+    </div>
+    
+    {% for element in elements_sablage %}
+    <div class="element-item">
+        <div class="element-details">
+            <div class="element-title">
+                {{ element.nom_type_piece }} - {{ element.nom_dn }}
+            </div>
+            <div class="element-specs">
+                Quantité: {{ element.quantite|floatformat:2 }} | 
+                Surface unitaire: {{ element.surface_unitaire|floatformat:3 }} m²
+            </div>
+        </div>
+        
+        <div class="element-surface">
+            <div class="surface-value">{{ element.surface_totale|floatformat:3 }}</div>
+            <small class="text-muted">m²</small>
+        </div>
+        
+        <form method="post" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="element_index" value="{{ forloop.counter0 }}">
+            <button type="submit" name="supprimer_element" class="btn-remove"
+                    onclick="return confirm('Supprimer cet élément ?')">
+                <i class="fas fa-trash"></i>
+            </button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Résumé total -->
+<div class="total-section">
+    <h4 class="mb-3">
+        <i class="fas fa-calculator me-2"></i>
+        Résumé du Sablage
+    </h4>
+    
+    <div class="row align-items-center">
+        <div class="col-md-4">
+            <div class="total-surface">{{ surface_globale|floatformat:3 }}</div>
+            <small>Surface globale (m²)</small>
+        </div>
+        <div class="col-md-4">
+            <div style="font-size: 1.5rem;">×</div>
+            <div>{{ prix_m2|floatformat:0 }} CFA/m²</div>
+            <small>Prix unitaire</small>
+        </div>
+        <div class="col-md-4">
+            <div class="total-price">{{ prix_total|floatformat:0 }}</div>
+            <small>Total CFA</small>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <form method="post" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" name="calculer_final" class="btn btn-light btn-lg me-3">
+                <i class="fas fa-check-circle me-2"></i>
+                Valider et Avancer
+            </button>
+        </form>
+        
+        <a href="{% url 'category_selection' %}" class="btn btn-outline-light btn-lg">
+            <i class="fas fa-times me-2"></i>
+            Annuler
+        </a>
+    </div>
+</div>
+{% else %}
+<!-- État vide -->
+<div class="text-center" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: var(--radius-lg); padding: 3rem; box-shadow: var(--shadow-md);">
+    <div style="font-size: 4rem; color: var(--text-secondary); margin-bottom: 2rem; opacity: 0.6;">
+        <i class="fas fa-spray-can"></i>
+    </div>
+    <h4 class="text-muted mb-3">Aucun élément de sablage</h4>
+    <p class="text-muted">
+        Commencez par sélectionner le type de pièce, le diamètre et la quantité ci-dessus.
+    </p>
+</div>
+{% endif %}
+
+<!-- Actions de navigation -->
+<div class="d-flex justify-content-between align-items-center mt-4 pt-3" style="border-top: 1px solid var(--border-color);">
+    <a href="{% url 'category_selection' %}" class="btn btn-secondary btn-lg">
+        <i class="fas fa-arrow-left me-2"></i>
+        Retour aux catégories
+    </a>
+    
+    {% if elements_sablage %}
+    <div class="text-center">
+        <small class="text-muted d-block">{{ nb_elements }} élément(s) prêt(s) pour validation</small>
+        <small class="text-success"><strong>{{ prix_total|floatformat:0 }} CFA</strong></small>
+    </div>
+    {% endif %}
+    
+    <a href="{% url 'rapport_projet' projet.id %}" class="btn btn-outline-success btn-lg">
+        <i class="fas fa-file-alt me-2"></i>
+        Voir le rapport
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Fonction de calcul en temps réel
+    function calculerApercu() {
+        const typePiece = $('#type_piece').val();
+        const dn = $('#dn').val();
+        const quantite = parseFloat($('#quantite').val()) || 0;
+
+        if (typePiece && dn && quantite > 0) {
+            // Appel AJAX pour récupérer la surface unitaire
+            $.ajax({
+                url: '{% url "ajax_calculer_surface_sablage" %}',
+                method: 'POST',
+                data: JSON.stringify({
+                    type_piece: typePiece,
+                    dn: dn,
+                    quantite: quantite
+                }),
+                contentType: 'application/json',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success && response.disponible) {
+                        $('#preview-su').text(response.surface_unitaire.toFixed(3));
+                        $('#preview-st').text(response.surface_totale.toFixed(3));
+                        $('#preview').slideDown(300);
+                        
+                        // Activer le bouton d'ajout
+                        $('button[name="ajouter_element"]').prop('disabled', false);
+                    } else {
+                        $('#preview').slideUp(300);
+                        $('button[name="ajouter_element"]').prop('disabled', true);
+                        
+                        if (!response.disponible) {
+                            showNotification('Cette combinaison n\'est pas disponible pour le sablage', 'warning');
+                        }
+                    }
+                },
+                error: function() {
+                    $('#preview').slideUp(300);
+                    $('button[name="ajouter_element"]').prop('disabled', true);
+                }
+            });
+        } else {
+            $('#preview').slideUp(300);
+            $('button[name="ajouter_element"]').prop('disabled', !typePiece || !dn || quantite <= 0);
+        }
+    }
+
+    // Événements pour le calcul en temps réel
+    $('#type_piece, #dn, #quantite').on('change input', function() {
+        calculerApercu();
+    });
+
+    // Fonction d'affichage des notifications
+    function showNotification(message, type = 'info') {
+        const alertClass = `alert-${type}`;
+        const icon = type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+        
+        const notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
+                 style="top: 20px; right: 20px; z-index: 1050; max-width: 400px;">
+                <i class="fas ${icon} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('body').append(notification);
+        
+        // Auto-hide après 5 secondes
+        setTimeout(() => {
+            notification.alert('close');
+        }, 5000);
+    }
+
+    // Animation des éléments ajoutés
+    $('.element-item').each(function(index) {
+        const item = $(this);
+        item.css('opacity', '0').delay(index * 100).animate({
+            opacity: 1
+        }, 300);
+    });
+
+    // Validation du formulaire
+    $('#sablageForm').on('submit', function(e) {
+        const typePiece = $('#type_piece').val();
+        const dn = $('#dn').val();
+        const quantite = parseFloat($('#quantite').val());
+
+        if (!typePiece || !dn || !quantite || quantite <= 0) {
+            e.preventDefault();
+            showNotification('Veuillez remplir tous les champs obligatoires', 'warning');
+        }
+    });
+
+    // Animation du calcul final
+    $('button[name="calculer_final"]').click(function(e) {
+        const button = $(this);
+        const originalText = button.html();
+        
+        // Animation de validation
+        button.html('<i class="fas fa-spinner fa-spin me-2"></i>Calcul en cours...');
+        button.prop('disabled', true);
+        
+        // Permettre la soumission après animation
+        setTimeout(() => {
+            button.closest('form').submit();
+        }, 1000);
+        
+        return false; // Empêcher la soumission immédiate pour montrer l'animation
+    });
+
+    // Calcul initial si des champs sont pré-remplis
+    calculerApercu();
+
+    // Animation des compteurs
+    function animateCounter(element, target, duration = 1000) {
+        const start = 0;
+        const increment = target / (duration / 16);
+        let current = start;
+        
+        const timer = setInterval(() => {
+            current += increment;
+            element.text(current.toFixed(target < 1 ? 3 : 0));
+            
+            if (current >= target) {
+                element.text(target.toFixed(target < 1 ? 3 : 0));
+                clearInterval(timer);
+            }
+        }, 16);
+    }
+
+    // Animer les valeurs des totaux
+    if ({{ surface_globale }} > 0) {
+        animateCounter($('.total-surface'), {{ surface_globale }}, 1200);
+    }
+    
+    if ({{ prix_total }} > 0) {
+        setTimeout(() => {
+            animateCounter($('.total-price'), {{ prix_total }}, 1500);
+        }, 500);
+    }
+
+    // Effet de focus amélioré
+    $('.form-control-modern').focus(function() {
+        $(this).closest('.mb-3').find('.form-label').addClass('text-primary');
+    }).blur(function() {
+        $(this).closest('.mb-3').find('.form-label').removeClass('text-primary');
+    });
+
+    // Confirmation de suppression
+    $('.btn-remove').click(function(e) {
+        const elementTitle = $(this).closest('.element-item').find('.element-title').text();
+        if (!confirm(`Supprimer ${elementTitle} ?`)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+
+{% endblock %}

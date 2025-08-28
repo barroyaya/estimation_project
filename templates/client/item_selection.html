@@ -1,0 +1,430 @@
+<!-- templates/client/item_selection.html -->
+{% extends 'base.html' %}
+
+{% block title %}{{ categorie.nom }} - {{ projet.nom }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'index' %}">Accueil</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'project_selection' %}">Projets</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'category_selection' %}">{{ projet.nom }}</a></li>
+                <li class="breadcrumb-item active">{{ categorie.nom }}</li>
+            </ol>
+        </nav>
+        
+        <h2 class="mb-4">
+            <i class="fas fa-list"></i> {{ categorie.nom }}
+        </h2>
+        
+        <!-- Onglets pour basculer entre éléments standards et personnalisés -->
+        <ul class="nav nav-tabs" id="elementTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="standard-tab" data-bs-toggle="tab" data-bs-target="#standard" type="button" role="tab">
+                    <i class="fas fa-list"></i> Éléments Standards
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="custom-tab" data-bs-toggle="tab" data-bs-target="#custom" type="button" role="tab">
+                    <i class="fas fa-plus"></i> Ajouter un élément personnalisé
+                </button>
+            </li>
+            {% if demandes_personnalisees %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="my-requests-tab" data-bs-toggle="tab" data-bs-target="#my-requests" type="button" role="tab">
+                    <i class="fas fa-clock"></i> Mes demandes ({{ demandes_personnalisees.count }})
+                </button>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content mt-4" id="elementTabsContent">
+    <!-- Onglet Éléments Standards -->
+    <div class="tab-pane fade show active" id="standard" role="tabpanel">
+        <!-- Filtres -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-6">
+                                <label for="search" class="form-label">Rechercher</label>
+                                <input type="text" class="form-control" id="search" name="search" 
+                                       value="{{ search_query }}" placeholder="Rechercher dans les désignations...">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="discipline" class="form-label">Discipline</label>
+                                <select class="form-select" id="discipline" name="discipline">
+                                    <option value="">Toutes les disciplines</option>
+                                    {% for discipline in disciplines %}
+                                        <option value="{{ discipline.id }}" 
+                                                {% if discipline.id|stringformat:"s" == discipline_selectionnee %}selected{% endif %}>
+                                            {{ discipline.nom }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-search"></i> Filtrer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste des éléments standards -->
+        <form method="post" id="elementsForm">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-12">
+                    {% if elements %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th width="5%">
+                                            <input type="checkbox" id="selectAll" class="form-check-input">
+                                        </th>
+                                        <th>Désignation</th>
+                                        <th>Caractéristiques</th>
+                                        <th>Prix unitaire</th>
+                                        <th>Unité</th>
+                                        <th>Discipline</th>
+                                        <th width="10%">Quantité</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for element in elements %}
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" name="elements" value="{{ element.id }}" 
+                                                   class="form-check-input element-checkbox"
+                                                   {% if element.id in elements_selectionnes %}checked{% endif %}>
+                                        </td>
+                                        <td>
+                                            <strong>{{ element.designation }}</strong>
+                                            {% if element.numero %}
+                                                <br><small class="text-muted">{{ element.numero }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ element.caracteristiques|default:"-" }}</td>
+                                        <td><span class="price-highlight">{{ element.prix_unitaire|floatformat:2 }} CFA</span></td>
+                                        <td>{{ element.get_unite_display }}</td>
+                                        <td>
+                                            <span class="badge" style="background-color: {{ element.discipline.couleur }};">
+                                                {{ element.discipline.nom }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="quantites" class="form-control form-control-sm" 
+                                                   value="1" min="0.1" step="0.1">
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        {% if elements.has_other_pages %}
+                        <nav aria-label="Navigation des pages">
+                            <ul class="pagination justify-content-center">
+                                {% if elements.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if discipline_selectionnee %}&discipline={{ discipline_selectionnee }}{% endif %}">Première</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ elements.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if discipline_selectionnee %}&discipline={{ discipline_selectionnee }}{% endif %}">Précédente</a>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">Page {{ elements.number }} sur {{ elements.paginator.num_pages }}</span>
+                                </li>
+                                
+                                {% if elements.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ elements.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if discipline_selectionnee %}&discipline={{ discipline_selectionnee }}{% endif %}">Suivante</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ elements.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if discipline_selectionnee %}&discipline={{ discipline_selectionnee }}{% endif %}">Dernière</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="submit" class="btn btn-success" id="submitBtn">
+                                <i class="fas fa-check"></i> Valider la sélection
+                            </button>
+                        </div>
+                        
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Aucun élément trouvé pour cette catégorie avec les filtres appliqués.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Onglet Élément Personnalisé -->
+    <div class="tab-pane fade" id="custom" role="tabpanel">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5><i class="fas fa-plus"></i> Demander un élément personnalisé</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            Vous ne trouvez pas l'élément que vous cherchez ? Ajoutez-le ici. 
+                            Il sera validé par notre équipe et vous recevrez une notification une fois le prix confirmé.
+                        </div>
+                        
+                        <form method="post" id="customElementForm">
+                            {% csrf_token %}
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="designation_personnalisee" class="form-label">Désignation *</label>
+                                    <input type="text" class="form-control" id="designation_personnalisee" 
+                                           name="designation_personnalisee" required
+                                           placeholder="Ex: Vanne papillon DN150">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="discipline_personnalisee" class="form-label">Discipline *</label>
+                                    <select class="form-select" id="discipline_personnalisee" name="discipline_personnalisee" required>
+                                        <option value="">-- Sélectionner --</option>
+                                        {% for discipline in disciplines %}
+                                            <option value="{{ discipline.id }}">{{ discipline.nom }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="caracteristiques_personnalisees" class="form-label">Caractéristiques</label>
+                                <textarea class="form-control" id="caracteristiques_personnalisees" 
+                                          name="caracteristiques_personnalisees" rows="3"
+                                          placeholder="Ex: Pression nominale PN16, Corps en fonte, Siège en EPDM..."></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="unite_personnalisee" class="form-label">Unité</label>
+                                    <select class="form-select" id="unite_personnalisee" name="unite_personnalisee">
+                                        <option value="u">Unité</option>
+                                        <option value="ml">Mètre linéaire</option>
+                                        <option value="m2">m²</option>
+                                        <option value="m3">m³</option>
+                                        <option value="kg">Kilogramme</option>
+                                        <option value="h">Heure</option>
+                                        <option value="j">Jour</option>
+                                        <option value="ens">Ensemble</option>
+                                        <option value="ff">Forfait</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="quantite_personnalisee" class="form-label">Quantité</label>
+                                    <input type="number" class="form-control" id="quantite_personnalisee" 
+                                           name="quantite_personnalisee" value="1" min="0.1" step="0.1">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" name="nouveau_element" class="btn btn-success">
+                                <i class="fas fa-paper-plane"></i> Envoyer la demande
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-question-circle"></i> Aide</h6>
+                    </div>
+                    <div class="card-body">
+                        <h6>Comment ça marche ?</h6>
+                        <ol class="small">
+                            <li>Remplissez le formulaire avec les détails de votre élément</li>
+                            <li>Votre demande est envoyée à notre équipe</li>
+                            <li>Nous vérifions la disponibilité et fixons le prix</li>
+                            <li>Vous recevez une notification de validation ou rejet</li>
+                            <li>L'élément approuvé est automatiquement ajouté à votre projet</li>
+                        </ol>
+                        
+                        <h6 class="mt-3">Statuts des demandes</h6>
+                        <ul class="small">
+                            <li><span class="badge bg-warning text-dark">En attente</span> - En cours de validation</li>
+                            <li><span class="badge bg-success">Approuvé</span> - Ajouté à votre estimation</li>
+                            <li><span class="badge bg-danger">Rejeté</span> - Non disponible</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onglet Mes Demandes -->
+    {% if demandes_personnalisees %}
+    <div class="tab-pane fade" id="my-requests" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clock"></i> Mes demandes d'éléments personnalisés</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Désignation</th>
+                                <th>Caractéristiques</th>
+                                <th>Quantité</th>
+                                <th>Discipline</th>
+                                <th>Statut</th>
+                                <th>Prix unitaire</th>
+                                <th>Date demande</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for demande in demandes_personnalisees %}
+                            <tr>
+                                <td><strong>{{ demande.designation }}</strong></td>
+                                <td>{{ demande.caracteristiques|default:"-"|truncatechars:50 }}</td>
+                                <td>{{ demande.quantite }} {{ demande.get_unite_display }}</td>
+                                <td>
+                                    <span class="badge" style="background-color: {{ demande.discipline.couleur }};">
+                                        {{ demande.discipline.nom }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if demande.statut == 'en_attente' %}
+                                        <span class="badge bg-warning text-dark">En attente</span>
+                                    {% elif demande.statut == 'approuve' %}
+                                        <span class="badge bg-success">Approuvé</span>
+                                    {% elif demande.statut == 'rejete' %}
+                                        <span class="badge bg-danger">Rejeté</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if demande.prix_unitaire_admin %}
+                                        <span class="price-highlight">{{ demande.prix_unitaire_admin|floatformat:2 }} CFA</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ demande.date_demande|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    {% if demande.statut == 'en_attente' %}
+                                        <a href="{% url 'supprimer_demande' demande.id %}" 
+                                           class="btn btn-sm btn-outline-danger"
+                                           onclick="return confirm('Supprimer cette demande ?')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    {% elif demande.statut == 'rejete' and demande.commentaire_admin %}
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="tooltip" 
+                                                title="{{ demande.commentaire_admin }}">
+                                            <i class="fas fa-info"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Navigation -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'category_selection' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Retour aux catégories
+            </a>
+            <a href="{% url 'demandes_personnalisees' %}" class="btn btn-outline-primary">
+                <i class="fas fa-list"></i> Voir toutes mes demandes
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Activer les tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Sélection de tous les éléments
+    $('#selectAll').change(function() {
+        $('.element-checkbox').prop('checked', this.checked);
+        checkSelection();
+    });
+    
+    // Vérification si des éléments sont sélectionnés
+    function checkSelection() {
+        var checkedElements = $('.element-checkbox:checked').length;
+        $('#submitBtn').prop('disabled', checkedElements === 0);
+        
+        if (checkedElements > 0) {
+            $('#submitBtn').removeClass('btn-secondary').addClass('btn-success');
+        } else {
+            $('#submitBtn').removeClass('btn-success').addClass('btn-secondary');
+        }
+    }
+    
+    $('.element-checkbox').change(checkSelection);
+    checkSelection(); // Vérification initiale
+    
+    // Soumission du formulaire des éléments standards
+    $('#elementsForm').submit(function(e) {
+        var checkedElements = $('.element-checkbox:checked').length;
+        if (checkedElements === 0) {
+            e.preventDefault();
+            alert('Veuillez sélectionner au moins un élément.');
+            return false;
+        }
+        
+        // Supprimer les quantités non cochées
+        $('.element-checkbox:not(:checked)').each(function() {
+            var index = $(this).closest('tr').index();
+            $('input[name="quantites"]').eq(index).remove();
+        });
+    });
+    
+    // Validation du formulaire d'élément personnalisé
+    $('#customElementForm').submit(function(e) {
+        var designation = $('#designation_personnalisee').val().trim();
+        var discipline = $('#discipline_personnalisee').val();
+        
+        if (!designation || !discipline) {
+            e.preventDefault();
+            alert('Veuillez remplir la désignation et sélectionner une discipline.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

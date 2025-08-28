@@ -1,0 +1,1025 @@
+{#template/client/rapport.html#}
+{% extends 'base.html' %}
+
+{% block title %}Rapport - {{ projet.nom }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rapport-header {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: var(--radius-xl);
+        padding: 2.5rem;
+        margin-bottom: 3rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .rapport-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        transform: translate(100px, -100px);
+    }
+
+    .rapport-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 200px;
+        height: 200px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 50%;
+        transform: translate(-50px, 50px);
+    }
+
+    .company-logo {
+        max-height: 80px;
+        filter: brightness(0) invert(1);
+        transition: all 0.3s ease;
+        opacity: 0.9;
+    }
+
+    .company-logo:hover {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+
+    .rapport-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .rapport-subtitle {
+        font-size: 1.6rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        opacity: 0.95;
+    }
+
+    .rapport-meta {
+        opacity: 0.8;
+        font-size: 1.1rem;
+    }
+
+    .category-section {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--radius-lg);
+        margin-bottom: 2rem;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        transition: all 0.3s ease;
+    }
+
+    .category-section:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .category-header {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 1.5rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .category-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .category-icon {
+        font-size: 1.5rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+    }
+
+    .category-total {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 1rem;
+        border-radius: var(--radius-md);
+        font-weight: 600;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .elements-table {
+        background: transparent;
+        margin: 0;
+    }
+
+    .elements-table thead th {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        color: var(--text-primary);
+        border: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        padding: 1.2rem 1rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .elements-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .elements-table tbody tr:hover {
+        background: rgba(102, 126, 234, 0.05);
+        transform: scale(1.005);
+    }
+
+    .elements-table td {
+        padding: 1.2rem 1rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+    .element-standard {
+        transition: all 0.3s ease;
+    }
+
+    .element-personnalise {
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(40, 167, 69, 0.05) 100%) !important;
+        border-left: 4px solid #28a745;
+        position: relative;
+    }
+
+    .element-personnalise::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, #28a745, transparent);
+    }
+
+    .element-sablage {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%) !important;
+        border-left: 4px solid #ffc107;
+        position: relative;
+    }
+
+    .element-sablage::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, #ffc107, transparent);
+    }
+
+    .element-sablage-temp {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.05) 0%, rgba(255, 193, 7, 0.02) 100%) !important;
+        border-left: 4px dashed #ffc107;
+        position: relative;
+    }
+
+    .element-designation {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .element-numero {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-style: italic;
+    }
+
+    .element-personnalise-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--success-gradient);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .element-sablage-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
+        color: #856404;
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .price-cell {
+        font-weight: 700;
+        background: var(--success-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 1.05em;
+    }
+
+    .total-price {
+        font-size: 1.1em;
+        font-weight: 800;
+    }
+
+    .summary-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+
+    .cost-breakdown {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+    }
+
+    .breakdown-header {
+        background: var(--success-gradient);
+        color: white;
+        padding: 1.5rem;
+        text-align: center;
+    }
+
+    .breakdown-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .breakdown-content {
+        padding: 2rem;
+    }
+
+    .cost-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.3s ease;
+    }
+
+    .cost-item:hover {
+        background: rgba(102, 126, 234, 0.05);
+        transform: translateX(5px);
+        border-radius: var(--radius-sm);
+        padding-left: 1rem;
+    }
+
+    .cost-item:last-child {
+        border-bottom: none;
+    }
+
+    .cost-label {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .cost-value {
+        font-weight: 700;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 1.1em;
+    }
+
+    .financial-summary {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .financial-summary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 150px;
+        height: 150px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        transform: translate(50px, -50px);
+    }
+
+    .summary-title {
+        text-align: center;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+
+    .summary-title h4 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        font-size: 1.1rem;
+    }
+
+    .summary-item:last-of-type {
+        border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 1rem;
+    }
+
+    .summary-total {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1.3rem;
+        font-weight: 700;
+        padding: 1rem 0;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .total-amount {
+        font-size: 1.5rem;
+        font-weight: 800;
+    }
+
+    .summary-meta {
+        text-align: center;
+        opacity: 0.8;
+        font-size: 0.9rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        padding-top: 1rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+    }
+
+    .empty-icon {
+        font-size: 5rem;
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        opacity: 0.6;
+    }
+
+    .actions-section {
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .btn-group-custom {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-enhanced {
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        border-radius: var(--radius-md);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-enhanced::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: all 0.5s;
+    }
+
+    .btn-enhanced:hover::before {
+        left: 100%;
+    }
+
+    .btn-enhanced:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    @media print {
+        .no-print { display: none !important; }
+        body { 
+            font-size: 11px; 
+            background: white !important;
+        }
+        .category-section { 
+            border: 1px solid #ddd !important; 
+            box-shadow: none !important; 
+            margin-bottom: 1rem !important;
+            background: white !important;
+        }
+        .rapport-header {
+            background: #667eea !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+        }
+        .category-header {
+            background: #667eea !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+        }
+        .financial-summary {
+            background: #667eea !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .summary-section {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .rapport-title {
+            font-size: 2rem;
+        }
+
+        .rapport-subtitle {
+            font-size: 1.3rem;
+        }
+
+        .category-header {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .btn-group-custom {
+            justify-content: center;
+        }
+
+        .elements-table {
+            font-size: 0.9rem;
+        }
+
+        .elements-table td {
+            padding: 0.8rem 0.5rem;
+        }
+    }
+
+    .fade-in-up {
+        animation: fadeInUp 0.8s ease-out;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- En-tête du rapport -->
+<div class="rapport-header fade-in-up">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <h1 class="rapport-title">
+                <i class="fas fa-file-invoice me-3"></i>
+                Rapport d'Estimation
+            </h1>
+            <h2 class="rapport-subtitle">{{ projet.nom }}</h2>
+            {% if projet.client %}
+                <div class="rapport-meta">
+                    <i class="fas fa-building me-2"></i>
+                    Client: <strong>{{ projet.client }}</strong>
+                </div>
+            {% endif %}
+        </div>
+        <div class="col-lg-4 text-lg-end text-center mt-3 mt-lg-0">
+            <img src="{% load static %}{% static 'img/logo.jpg' %}" alt="Logo Entreprise" class="company-logo img-fluid mb-3">
+            <div class="rapport-meta">
+                <div class="mb-1">
+                    <i class="fas fa-calendar-alt me-2"></i>
+                    Date: <strong>{{ summary.derniere_mise_a_jour|date:"d/m/Y" }}</strong>
+                </div>
+                <div>
+                    <i class="fas fa-clock me-2"></i>
+                    {{ summary.derniere_mise_a_jour|date:"H:i" }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if elements_par_categorie %}
+    <!-- Détail par catégorie -->
+    {% for categorie_nom, data in elements_par_categorie.items %}
+    <div class="category-section fade-in-up" style="animation-delay: {{ forloop.counter0|add:1|floatformat:1 }}00ms;">
+        <div class="category-header">
+            <div class="category-title">
+                <div class="category-icon">
+                    {% if data.categorie and data.categorie.type_categorie == 'materiel' %}
+                        <i class="fas fa-tools"></i>
+                    {% elif data.categorie and data.categorie.type_categorie == 'main_oeuvre' %}
+                        <i class="fas fa-users"></i>
+                    {% elif data.categorie and data.categorie.type_categorie == 'transport' %}
+                        <i class="fas fa-truck"></i>
+                    {% elif data.categorie and data.categorie.type_categorie == 'etude' %}
+                        <i class="fas fa-clipboard-list"></i>
+                    {% else %}
+                        <i class="fas fa-layer-group"></i>
+                    {% endif %}
+                </div>
+                <span>{{ categorie_nom }}</span>
+            </div>
+            <div class="category-total">
+                <i class="fas fa-coins me-2"></i>
+                Total: {{ data.total|floatformat:2 }} CFA
+                {% if data.sablage_temporaire %}
+                    <small class="d-block text-warning">
+                        <i class="fas fa-clock me-1"></i>
+                        + {{ data.sablage_temporaire.prix_total|floatformat:2 }} CFA (sablage en cours)
+                    </small>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="elements-table table">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-tag me-2"></i>Désignation</th>
+                        <th><i class="fas fa-info-circle me-2"></i>Caractéristiques</th>
+                        <th><i class="fas fa-money-bill me-2"></i>Prix unitaire</th>
+                        <th><i class="fas fa-calculator me-2"></i>Quantité</th>
+                        <th><i class="fas fa-ruler me-2"></i>Unité</th>
+                        <th><i class="fas fa-coins me-2"></i>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Éléments standards -->
+                    {% for element in data.elements %}
+                    <tr class="element-standard">
+                        <td>
+                            <div class="element-designation">{{ element.designation }}</div>
+                            {% if element.element and element.element.numero %}
+                                <div class="element-numero">Réf: {{ element.element.numero }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ element.caracteristiques|default:"-" }}</td>
+                        <td class="price-cell">{{ element.prix_unitaire_utilise|floatformat:2 }} CFA</td>
+                        <td><strong>{{ element.quantite|floatformat:2 }}</strong></td>
+                        <td>{{ element.unite_display }}</td>
+                        <td class="price-cell total-price">{{ element.cout_total|floatformat:2 }} CFA</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <!-- Éléments de sablage validés -->
+                    {% for element_sablage in data.elements_sablage %}
+                    <tr class="element-sablage">
+                        <td>
+                            <div class="element-designation">{{ element_sablage.designation|default:"Sablage Tuyauterie" }}</div>
+                            <div class="mt-2">
+                                <span class="element-sablage-badge">
+                                    <i class="fas fa-spray-can"></i>
+                                    Sablage Tuyauterie
+                                </span>
+                            </div>
+                        </td>
+                        <td>{{ element_sablage.caracteristiques|default:"-" }}</td>
+                        <td class="price-cell">{{ element_sablage.prix_unitaire_utilise|floatformat:2 }} CFA</td>
+                        <td><strong>{{ element_sablage.quantite|floatformat:3 }}</strong></td>
+                        <td>{{ element_sablage.unite_display|default:"m²" }}</td>
+                        <td class="price-cell total-price">{{ element_sablage.cout_total|floatformat:2 }} CFA</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <!-- Sablage temporaire (en cours de calcul) -->
+                    {% if data.sablage_temporaire %}
+                    <tr class="element-sablage-temp">
+                        <td>
+                            <div class="element-designation">Sablage Tuyauterie (en cours)</div>
+                            <div class="mt-2">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-clock"></i>
+                                    {{ data.sablage_temporaire.nb_elements }} élément(s) temporaire(s)
+                                </span>
+                            </div>
+                            <!-- Détail des éléments temporaires -->
+                            <div class="small text-muted mt-2">
+                                {% for elem_temp in data.sablage_temporaire.elements %}
+                                    {{ elem_temp.nom_type_piece }} {{ elem_temp.nom_dn }} ({{ elem_temp.quantite|floatformat:2 }}){% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="mt-2">
+                                <a href="{% url 'sablage_tuyauterie' data.categorie.id %}" class="btn btn-sm btn-outline-warning">
+                                    <i class="fas fa-edit me-1"></i>Finaliser le calcul
+                                </a>
+                            </div>
+                        </td>
+                        <td>Surface: {{ data.sablage_temporaire.surface_globale|floatformat:3 }} m²</td>
+                        <td class="price-cell">{{ data.sablage_temporaire.prix_unitaire|floatformat:2 }} CFA</td>
+                        <td><strong>{{ data.sablage_temporaire.surface_globale|floatformat:3 }}</strong></td>
+                        <td>m²</td>
+                        <td class="price-cell" style="color: #856404; font-style: italic;">
+                            {{ data.sablage_temporaire.prix_total|floatformat:2 }} CFA
+                            <br><small>(non validé)</small>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    <!-- Demandes personnalisées approuvées -->
+                    {% for demande in data.demandes_approuvees %}
+                    <tr class="element-personnalise">
+                        <td>
+                            <div class="element-designation">{{ demande.designation }}</div>
+                            <div class="mt-2">
+                                <span class="element-personnalise-badge">
+                                    <i class="fas fa-user-plus"></i>
+                                    Élément personnalisé
+                                </span>
+                            </div>
+                        </td>
+                        <td>{{ demande.caracteristiques|default:"-" }}</td>
+                        <td class="price-cell">{{ demande.prix_unitaire_admin|floatformat:2 }} CFA</td>
+                        <td><strong>{{ demande.quantite|floatformat:2 }}</strong></td>
+                        <td>{{ demande.get_unite_display }}</td>
+                        <td class="price-cell total-price">{{ demande.cout_total|floatformat:2 }} CFA</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Résumé financier -->
+    <div class="summary-section fade-in-up">
+        <!-- Répartition des coûts -->
+        <div class="cost-breakdown">
+            <div class="breakdown-header">
+                <h5 class="breakdown-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Répartition des Coûts
+                </h5>
+            </div>
+            <div class="breakdown-content">
+                {% if summary.cout_total_materiel > 0 %}
+                <div class="cost-item">
+                    <div class="cost-label">
+                        <i class="fas fa-tools text-primary"></i>
+                        Matériel
+                    </div>
+                    <div class="cost-value">{{ summary.cout_total_materiel|floatformat:2 }} CFA</div>
+                </div>
+                {% endif %}
+                
+                {% if summary.cout_total_main_oeuvre > 0 %}
+                <div class="cost-item">
+                    <div class="cost-label">
+                        <i class="fas fa-users text-success"></i>
+                        Main d'œuvre
+                        {% if totaux_par_type.sablage > 0 %}
+                            <small class="d-block text-muted">
+                                dont {{ totaux_par_type.sablage|floatformat:2 }} CFA de sablage
+                            </small>
+                        {% endif %}
+                    </div>
+                    <div class="cost-value">{{ summary.cout_total_main_oeuvre|floatformat:2 }} CFA</div>
+                </div>
+                {% endif %}
+                
+                {% if summary.cout_total_transport > 0 %}
+                <div class="cost-item">
+                    <div class="cost-label">
+                        <i class="fas fa-truck text-warning"></i>
+                        Transport
+                    </div>
+                    <div class="cost-value">{{ summary.cout_total_transport|floatformat:2 }} CFA</div>
+                </div>
+                {% endif %}
+                
+                {% if summary.cout_total_etude > 0 %}
+                <div class="cost-item">
+                    <div class="cost-label">
+                        <i class="fas fa-clipboard-list text-info"></i>
+                        Études
+                    </div>
+                    <div class="cost-value">{{ summary.cout_total_etude|floatformat:2 }} CFA</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Résumé financier -->
+        <div class="financial-summary">
+            <div class="summary-title">
+                <h4>
+                    <i class="fas fa-calculator me-2"></i>
+                    Résumé Financier
+                </h4>
+                <small class="opacity-75">Synthèse des coûts du projet</small>
+                {% if has_sablage %}
+                    <div class="mt-2">
+                        <span class="badge bg-light text-warning">
+                            <i class="fas fa-spray-can me-1"></i>
+                            Inclut du sablage tuyauterie
+                        </span>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="summary-item">
+                <span>Sous-total HT</span>
+                <strong>{{ summary.cout_total_ht|floatformat:2 }} CFA</strong>
+            </div>
+            
+            <div class="summary-item">
+                <span>TVA ({{ summary.tva_taux }}%)</span>
+                <strong>{{ summary.tva_montant|floatformat:2 }} CFA</strong>
+            </div>
+            
+            <div class="summary-total">
+                <span>Total TTC</span>
+                <span class="total-amount">{{ summary.cout_total_ttc|floatformat:2 }} CFA</span>
+            </div>
+            
+            <div class="summary-meta">
+                <i class="fas fa-info-circle me-1"></i>
+                {{ total_elements }} élément{{ total_elements|pluralize }} sélectionné{{ total_elements|pluralize }}
+                {% if has_sablage %}
+                    <br><i class="fas fa-spray-can me-1 mt-2"></i>
+                    Calculs de sablage inclus
+                {% endif %}
+                <br>
+                <i class="fas fa-check-circle me-1 mt-2"></i>
+                Estimation validée le {{ summary.derniere_mise_a_jour|date:"d/m/Y à H:i" }}
+            </div>
+        </div>
+    </div>
+
+{% else %}
+    <!-- État vide -->
+    <div class="empty-state fade-in-up">
+        <div class="empty-icon">
+            <i class="fas fa-inbox"></i>
+        </div>
+        <h3 class="text-muted mb-3">Aucun élément sélectionné</h3>
+        <p class="text-muted mb-4">
+            Votre projet ne contient pas encore d'éléments d'estimation.<br>
+            Commencez par sélectionner des éléments pour générer votre rapport.
+        </p>
+        <a href="{% url 'category_selection' %}" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus-circle me-2"></i>Ajouter des éléments
+        </a>
+    </div>
+{% endif %}
+
+<!-- Actions -->
+<div class="actions-section no-print fade-in-up">
+    <div class="action-buttons">
+        <div class="btn-group-custom">
+            <a href="{% url 'category_selection' %}" class="btn btn-secondary btn-enhanced">
+                <i class="fas fa-edit me-2"></i>Modifier la sélection
+            </a>
+            <a href="{% url 'project_selection' %}" class="btn btn-outline-secondary btn-enhanced">
+                <i class="fas fa-arrow-left me-2"></i>Autres projets
+            </a>
+        </div>
+        <div class="btn-group-custom">
+            <button onclick="window.print()" class="btn btn-success btn-enhanced">
+                <i class="fas fa-print me-2"></i>Imprimer
+            </button>
+            <a href="{% url 'export_pdf' projet.id %}" class="btn btn-primary btn-enhanced">
+                <i class="fas fa-file-pdf me-2"></i>Exporter PDF
+            </a>
+            <a href="{% url 'export_excel' projet.id %}" class="btn btn-info btn-enhanced">
+                <i class="fas fa-file-excel me-2"></i>Exporter Excel
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animation au scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('fade-in-up');
+            }
+        });
+    }, observerOptions);
+
+    // Observer toutes les sections
+    const sections = document.querySelectorAll('.category-section, .summary-section, .actions-section');
+    sections.forEach(section => {
+        observer.observe(section);
+    });
+
+    // Animation des éléments de coût au hover
+    const costItems = document.querySelectorAll('.cost-item');
+    costItems.forEach(item => {
+        item.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateX(10px)';
+            this.style.background = 'rgba(102, 126, 234, 0.1)';
+        });
+        
+        item.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateX(0)';
+            this.style.background = 'transparent';
+        });
+    });
+
+    // Effet de typing pour le titre
+    const title = document.querySelector('.rapport-title');
+    if (title) {
+        const originalText = title.innerHTML;
+        const textOnly = title.textContent;
+        title.innerHTML = originalText.replace(textOnly.trim(), '');
+        let index = 0;
+        
+        function typeWriter() {
+            if (index < textOnly.trim().length) {
+                const currentText = title.innerHTML;
+                const iconPart = currentText.match(/<i[^>]*><\/i>/g)?.[0] || '';
+                title.innerHTML = iconPart + textOnly.trim().charAt(index);
+                index++;
+                setTimeout(typeWriter, 50);
+            } else {
+                title.innerHTML = originalText;
+            }
+        }
+        
+        // Démarrer l'animation après un court délai
+        setTimeout(typeWriter, 500);
+    }
+
+    // Animation de compteur pour les montants
+    function animateValue(element, start, end, duration) {
+        const startTime = performance.now();
+        const startVal = parseFloat(start) || 0;
+        const endVal = parseFloat(end.toString().replace(/[^\d.,]/g, '').replace(',', '.'));
+        
+        function updateValue(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const currentVal = startVal + (endVal - startVal) * progress;
+            
+            const formatted = new Intl.NumberFormat('fr-FR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(currentVal);
+            
+            element.textContent = formatted + ' CFA';
+            
+            if (progress < 1) {
+                requestAnimationFrame(updateValue);
+            }
+        }
+        
+        requestAnimationFrame(updateValue);
+    }
+
+    // Déclencher l'animation des montants quand ils entrent dans la vue
+    const amounts = document.querySelectorAll('.cost-value, .total-amount');
+    amounts.forEach(amount => {
+        const amountObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const originalText = entry.target.textContent;
+                    const finalValue = originalText.replace(/[^\d.,]/g, '').replace(',', '.');
+                    if (finalValue && !isNaN(parseFloat(finalValue))) {
+                        animateValue(entry.target, 0, parseFloat(finalValue), 1500);
+                        amountObserver.unobserve(entry.target);
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+        
+        amountObserver.observe(amount);
+    });
+
+    // Animation pour les éléments de sablage
+    const sablageElements = document.querySelectorAll('.element-sablage, .element-sablage-temp');
+    sablageElements.forEach((element, index) => {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            element.style.transition = 'all 0.6s ease-out';
+            element.style.opacity = '1';
+            element.style.transform = 'translateY(0)';
+        }, (index + 1) * 200);
+    });
+
+    // Gestion des boutons d'export avec animation
+    const exportButtons = document.querySelectorAll('a[href*="export"]');
+    exportButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            const originalHTML = this.innerHTML;
+            const isPDF = this.href.includes('pdf');
+            const iconClass = isPDF ? 'fa-file-pdf' : 'fa-file-excel';
+            const loadingText = isPDF ? 'Génération PDF...' : 'Génération Excel...';
+            
+            this.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${loadingText}`;
+            this.style.pointerEvents = 'none';
+            
+            // Rétablir le bouton après un délai pour permettre le téléchargement
+            setTimeout(() => {
+                this.innerHTML = originalHTML;
+                this.style.pointerEvents = 'auto';
+            }, 3000);
+        });
+    });
+});
+</script>
+{% endblock %}
