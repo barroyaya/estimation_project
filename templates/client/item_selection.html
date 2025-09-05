@@ -116,7 +116,14 @@
                                         </td>
                                         <td>{{ element.caracteristiques|default:"-" }}</td>
                                         <td><span class="price-highlight">{{ element.prix_unitaire|floatformat:2 }} CFA</span></td>
-                                        <td>{{ element.get_unite_display }}</td>
+                                        <td>
+                                          {% if element.unite %}
+                                            {{ element.unite.symbole|default:element.unite.libelle }}
+                                          {% else %}
+                                            u
+                                          {% endif %}
+                                        </td>
+
                                         <td>
                                             <span class="badge" style="background-color: {{ element.discipline.couleur }};">
                                                 {{ element.discipline.nom }}
@@ -304,7 +311,15 @@
                             <tr>
                                 <td><strong>{{ demande.designation }}</strong></td>
                                 <td>{{ demande.caracteristiques|default:"-"|truncatechars:50 }}</td>
-                                <td>{{ demande.quantite }} {{ demande.get_unite_display }}</td>
+                                <td>
+                                  {{ demande.quantite }}
+                                  {% if demande.unite %}
+                                    {{ demande.unite.symbole|default:demande.unite.libelle }}
+                                  {% else %}
+                                    u
+                                  {% endif %}
+                                </td>
+
                                 <td>
                                     <span class="badge" style="background-color: {{ demande.discipline.couleur }};">
                                         {{ demande.discipline.nom }}

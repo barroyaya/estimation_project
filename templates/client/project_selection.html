@@ -1,117 +1,288 @@
-{#template/client/project_selection.html#}
-
+{# templates/client/project_selection.html #}
 {% extends 'base.html' %}
 
 {% block title %}Sélection Projet - Système d'Estimation{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Palettes (mélanges) */
+  :root{
+    --mix-cool:   linear-gradient(135deg,#3C5FA4 0%,#22D3EE 100%);   /* bleu → cyan */
+    --mix-fresh:  linear-gradient(135deg,#10B981 0%,#34D399 100%);   /* vert → turquoise */
+    --mix-warm:   linear-gradient(135deg,#F59E0B 0%,#F97316 100%);   /* ambre → corail */
+    --mix-danger: linear-gradient(135deg,#EF4444 0%,#F43F5E 100%);   /* rouges */
+    --ring:       0 0 0 .2rem rgba(60,95,164,.18);                   /* halo focus bleu */
+  }
+
+  /* Bandeau de page avec mélange cool */
+  .page-hero{
+    background: var(--mix-cool);
+    border-radius: var(--radius-xl);
+    color:#fff; position:relative; overflow:hidden;
+    padding: 1.6rem 1.25rem; margin-bottom: 1.25rem;
+    box-shadow: var(--shadow-lg);
+  }
+  .page-hero::after{
+    content:''; position:absolute; inset:auto 0 0 0; height:80px;
+    background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100" fill="rgba(255,255,255,0.12)"><polygon points="0,100 1000,100 1000,40 800,70 600,20 400,80 200,30 0,60"/></svg>') center/cover no-repeat;
+  }
+  .page-hero h2{ margin:0; font-weight:700 }
+  .page-hero p{ margin:.25rem 0 0; opacity:.95 }
+
+  /* Cartes actions avec bande colorée en haut (mélange différent par carte) */
+  .action-card{
+    border-radius: var(--radius-xl);
+    background: rgba(255,255,255,.96);
+    border:1px solid rgba(0,0,0,.04);
+    box-shadow: var(--shadow-md);
+    overflow:hidden; transition:.3s ease; position:relative;
+  }
+  .action-card::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:6px;
+    transform:scaleX(1); transform-origin:left;
+  }
+  .action-card.mix-fresh::before{ background: var(--mix-fresh) }
+  .action-card.mix-cool::before{  background: var(--mix-cool)  }
+  .action-card:hover{ transform: translateY(-6px); box-shadow: var(--shadow-xl) }
+
+  .action-card .card-header{ background:transparent; border:none; padding:1.1rem 1.2rem 0 }
+  .action-card .card-title{
+    display:flex; align-items:center; gap:.6rem; margin:0;
+    font-weight:700; color:var(--text-primary);
+  }
+  .chip{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:36px; height:36px; border-radius:12px; color:#fff; font-weight:700;
+    box-shadow:0 6px 16px rgba(0,0,0,.15);
+  }
+  .chip.fresh{ background: var(--mix-fresh) }
+  .chip.cool{  background: var(--mix-cool)  }
+
+  .card-body{ padding:1.2rem }
+
+  /* Inputs & focus */
+  .form-label{ font-weight:600 }
+  .form-control:focus, .form-select:focus{ box-shadow: var(--ring) !important; border-color:#3C5FA4 !important }
+
+  /* Boutons dégradés */
+  .btn-mix-fresh{ background:var(--mix-fresh); color:#fff; border:none }
+  .btn-mix-cool{  background:var(--mix-cool);  color:#fff; border:none }
+  .btn-mix-danger{background:var(--mix-danger);color:#fff; border:none }
+  .btn-outline-warm{
+    background:transparent; color:#F59E0B; border:2px solid #F59E0B;
+  }
+  .btn-outline-warm:hover{ background:var(--mix-warm); color:#111827; border-color:transparent }
+
+  /* Tableau récents avec mélange chaud en tête */
+  .recent-table thead th{
+    background: var(--mix-warm) !important;
+    color:#fff; border:none; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .recent-table tbody tr:hover{ background: rgba(60,95,164,.06) }
+
+  /* Blocs vides */
+  .empty{ text-align:center; color:var(--text-secondary); padding:2rem 1rem }
+  .empty i{ font-size:3rem; margin-bottom:.75rem; background:var(--mix-cool);
+            -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  /* Petite barre d’outils au-dessus du select (recherche client-side) */
+  .toolbox{ display:flex; gap:.6rem; align-items:center; margin-bottom:.75rem }
+  .search{ position:relative; flex:1 }
+  .search .form-control{ padding-left:2.2rem }
+  .search .icon{ position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--text-secondary) }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h2 class="mb-4">
-            <i class="fas fa-project-diagram"></i> Sélection du Projet
-        </h2>
-    </div>
+
+<!-- Bandeau -->
+<div class="page-hero">
+  <h2><i class="fas fa-project-diagram me-2"></i> Sélection du Projet</h2>
+  <p>Créez un nouveau projet ou continuez un projet existant. Les éléments utilisent des <strong>mélanges de couleurs</strong> pour mieux guider l’œil.</p>
 </div>
 
-<div class="row">
-    <!-- Nouveau projet -->
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-success text-white">
-                <h5><i class="fas fa-plus"></i> Créer un nouveau projet</h5>
+<div class="row g-4">
+  <!-- Nouveau projet (vert→turquoise) -->
+  <div class="col-lg-6">
+    <div class="card action-card mix-fresh h-100">
+      <div class="card-header">
+        <h5 class="card-title">
+          <span class="chip fresh">1</span>
+          Créer un nouveau projet
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="post" autocomplete="off">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="nom_projet" class="form-label">Nom du projet <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fas fa-pen"></i></span>
+              <input type="text" class="form-control" id="nom_projet" name="nom_projet" required placeholder="Ex. Réseau tuyauterie – Site Ouest">
             </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="nom_projet" class="form-label">Nom du projet *</label>
-                        <input type="text" class="form-control" id="nom_projet" name="nom_projet" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="client" class="form-label">Client</label>
-                        <input type="text" class="form-control" id="client" name="client">
-                    </div>
-                    <button type="submit" name="nouveau_projet" class="btn btn-success w-100">
-                        <i class="fas fa-rocket"></i> Créer le projet
-                    </button>
-                </form>
-            </div>
-        </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="description" class="form-label">Description (optionnel)</label>
+            <textarea class="form-control" id="description" name="description" rows="3" placeholder="Brève description du projet, contexte, objectifs…"></textarea>
+          </div>
+
+          <button type="submit" name="nouveau_projet" class="btn btn-mix-fresh w-100">
+            <i class="fas fa-rocket me-2"></i> Créer le projet
+          </button>
+        </form>
+      </div>
     </div>
-    
-    <!-- Projet existant -->
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header bg-primary text-white">
-                <h5><i class="fas fa-folder-open"></i> Continuer un projet existant</h5>
+  </div>
+
+  <!-- Projet existant (bleu→cyan) -->
+  <div class="col-lg-6">
+    <div class="card action-card mix-cool h-100">
+      <div class="card-header">
+        <h5 class="card-title">
+          <span class="chip cool">2</span>
+          Continuer un projet existant
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if projets %}
+          <div class="toolbox">
+            <div class="search">
+              <i class="fas fa-search icon"></i>
+              <input type="text" id="searchProject" class="form-control" placeholder="Rechercher un projet…">
             </div>
-            <div class="card-body">
-                {% if projets %}
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="projet_id" class="form-label">Sélectionner un projet</label>
-                            <select class="form-select" id="projet_id" name="projet_id" required>
-                                <option value="">-- Choisir un projet --</option>
-                                {% for projet in projets %}
-                                    <option value="{{ projet.id }}">
-                                        {{ projet.nom }}{% if projet.client %} - {{ projet.client }}{% endif %}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <button type="submit" name="projet_existant" class="btn btn-primary w-100">
-                            <i class="fas fa-arrow-right"></i> Continuer
-                        </button>
-                    </form>
-                {% else %}
-                    <div class="text-center text-muted">
-                        <i class="fas fa-folder-open fa-3x mb-3"></i>
-                        <p>Aucun projet existant trouvé.</p>
-                        <p>Créez votre premier projet pour commencer.</p>
-                    </div>
-                {% endif %}
+          </div>
+
+          <form method="post" id="continueForm" class="mb-2">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="projet_id" class="form-label">Sélectionner un projet</label>
+              <select class="form-select" id="projet_id" name="projet_id" required>
+                <option value="">-- Choisir un projet --</option>
+                {% for projet in projets %}
+                  <option value="{{ projet.id }}">{{ projet.nom }}</option>
+                {% endfor %}
+              </select>
             </div>
-        </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" name="projet_existant" class="btn btn-mix-cool flex-fill">
+                <i class="fas fa-arrow-right"></i> Continuer
+              </button>
+              <!-- Formulaire séparé pour la suppression -->
+              <form id="deleteForm" method="post" action="#"
+                    onsubmit="return confirm('Supprimer ce projet ? Cette action est irréversible.');" class="flex-fill">
+                {% csrf_token %}
+                <button type="submit" id="deleteBtn" class="btn btn-mix-danger w-100" disabled>
+                  <i class="fas fa-trash"></i> Supprimer
+                </button>
+              </form>
+            </div>
+          </form>
+        {% else %}
+          <div class="empty">
+            <i class="fas fa-folder-open"></i>
+            <p class="mb-1">Aucun projet existant trouvé.</p>
+            <p>Créez votre premier projet pour commencer.</p>
+          </div>
+        {% endif %}
+      </div>
     </div>
+  </div>
 </div>
 
-<!-- Projets récents -->
+<!-- Projets récents (en-tête ambre→corail) -->
 {% if projets %}
-<div class="row mt-4">
-    <div class="col-12">
-        <h4>Projets récents</h4>
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Nom du projet</th>
-                        <th>Client</th>
-                        <th>Date de création</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for projet in projets|slice:":5" %}
-                    <tr>
-                        <td>{{ projet.nom }}</td>
-                        <td>{{ projet.client|default:"-" }}</td>
-                        <td>{{ projet.date_creation|date:"d/m/Y H:i" }}</td>
-                        <td>
-                            <form method="post" style="display: inline;">
-                                {% csrf_token %}
-                                <input type="hidden" name="projet_id" value="{{ projet.id }}">
-                                <button type="submit" name="projet_existant" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-edit"></i> Continuer
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <div class="card glass-card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background:var(--mix-warm); color:#111827;">
+      <h5 class="mb-0"><i class="fas fa-history me-2"></i> Projets récents</h5>
+      <span class="small" style="opacity:.85">Derniers 5</span>
     </div>
-</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table mb-0 recent-table">
+          <thead>
+            <tr>
+              <th>Nom du projet</th>
+              <th>Date de création</th>
+              <th class="text-end" style="width:240px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recentTable">
+            {% for projet in projets|slice:":5" %}
+            <tr>
+              <td>{{ projet.nom }}</td>
+              <td>{{ projet.date_creation|date:"d/m/Y H:i" }}</td>
+              <td class="text-end">
+                <form method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="projet_id" value="{{ projet.id }}">
+                  <button type="submit" name="projet_existant" class="btn btn-sm btn-outline-warm">
+                    <i class="fas fa-edit"></i> Continuer
+                  </button>
+                </form>
+
+                <form method="post" action="{% url 'supprimer_projet' projet.id %}"
+                      style="display:inline;"
+                      onsubmit="return confirm('Supprimer le projet « {{ projet.nom }} » ? Cette action est irréversible.');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-mix-danger ms-1">
+                    <i class="fas fa-trash"></i> Supprimer
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted p-3">Aucun projet récent.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const select   = document.getElementById('projet_id');
+  const delForm  = document.getElementById('deleteForm');
+  const delBtn   = document.getElementById('deleteBtn');
+  const search   = document.getElementById('searchProject');
+
+  function updateDeleteAction(){
+    if(!select || !delForm || !delBtn) return;
+    const id = select.value;
+    if(id){
+      delForm.action = "{% url 'supprimer_projet' 0 %}".replace(/0\/$/, id + "/");
+      delBtn.disabled = false;
+    }else{
+      delForm.action = "#";
+      delBtn.disabled = true;
+    }
+  }
+
+  function filterProjects(q){
+    if(!select) return;
+    q = (q || '').toLowerCase().trim();
+    [...select.options].forEach((opt,i)=>{
+      if(i===0) return;
+      opt.hidden = q && !opt.text.toLowerCase().includes(q);
+    });
+    if(select.selectedOptions[0] && select.selectedOptions[0].hidden){
+      select.value = "";
+      updateDeleteAction();
+    }
+  }
+
+  if(select){
+    select.addEventListener('change', updateDeleteAction);
+    updateDeleteAction();
+  }
+  if(search){
+    search.addEventListener('input', e=> filterProjects(e.target.value));
+  }
+})();
+</script>
 {% endblock %}

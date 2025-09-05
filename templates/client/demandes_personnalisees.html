@@ -457,7 +457,7 @@
             <div class="stat-number" id="count-en-attente">0</div>
             <div class="stat-label text-warning">En attente</div>
         </div>
-        
+
         <div class="stat-card success">
             <div class="stat-icon text-success">
                 <i class="fas fa-check-circle"></i>
@@ -465,7 +465,7 @@
             <div class="stat-number" id="count-approuve">0</div>
             <div class="stat-label text-success">Approuvées</div>
         </div>
-        
+
         <div class="stat-card danger">
             <div class="stat-icon text-danger">
                 <i class="fas fa-times-circle"></i>
@@ -473,7 +473,7 @@
             <div class="stat-number" id="count-rejete">0</div>
             <div class="stat-label text-danger">Rejetées</div>
         </div>
-        
+
         <div class="stat-card info">
             <div class="stat-icon text-info">
                 <i class="fas fa-chart-pie"></i>
@@ -514,7 +514,7 @@
                 Liste de vos demandes personnalisées
             </h5>
         </div>
-        
+
         <div class="table-responsive">
             <table class="enhanced-table table" id="demandesTable">
                 <thead>
@@ -668,7 +668,7 @@
                             </p>
                             <p><strong>Quantité:</strong> {{ demande.quantite }} {{ demande.get_unite_display }}</p>
                         </div>
-                        
+
                         <div class="info-card">
                             <h6><i class="fas fa-check-circle me-2"></i>Validation</h6>
                             <p><strong>Statut:</strong>
@@ -768,11 +768,11 @@ $(document).ready(function() {
         const counter = { value: 0 };
         const duration = 1000;
         const increment = target / (duration / 16);
-        
+
         const timer = setInterval(() => {
             counter.value += increment;
             element.text(Math.floor(counter.value));
-            
+
             if (counter.value >= target) {
                 element.text(target);
                 clearInterval(timer);
@@ -806,7 +806,7 @@ $(document).ready(function() {
 
         // Animation de sortie des lignes
         $('.demande-row').addClass('fade-out');
-        
+
         setTimeout(() => {
             // Filtrer les lignes
             if (filter === 'all') {
@@ -815,7 +815,7 @@ $(document).ready(function() {
                 $('.demande-row').hide().removeClass('fade-out');
                 $(`.demande-row[data-statut="${filter}"]`).show();
             }
-            
+
             // Animation d'entrée
             $('.demande-row:visible').each(function(index) {
                 const row = $(this);
@@ -879,7 +879,7 @@ $(document).ready(function() {
         e.preventDefault();
         const href = $(this).attr('href');
         const demande = $(this).closest('tr').find('td:first strong').text();
-        
+
         if (confirm(`Êtes-vous sûr de vouloir supprimer la demande "${demande}" ?\n\nCette action est irréversible.`)) {
             // Animation de suppression
             $(this).closest('tr').addClass('fade-out');
@@ -897,11 +897,11 @@ style.textContent = `
         opacity: 0 !important;
         transform: translateX(-20px) !important;
     }
-    
+
     .fade-in {
         animation: fadeInUp 0.6s ease-out !important;
     }
-    
+
     @keyframes fadeInUp {
         from {
             opacity: 0;

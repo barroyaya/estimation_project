@@ -1,88 +1,263 @@
-{#template/client/category_selection.html#}
+{# template/client/category_selection.html #}
 {% extends 'base.html' %}
 
 {% block title %}Sélection Catégorie - {{ projet.nom }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Dégradés mélangés (zéro violet) */
+  :root{
+    --mix-cool:   linear-gradient(135deg,#3C5FA4 0%,#22D3EE 100%);   /* bleu → cyan */
+    --mix-fresh:  linear-gradient(135deg,#10B981 0%,#34D399 100%);   /* vert → turquoise */
+    --mix-warm:   linear-gradient(135deg,#F59E0B 0%,#F97316 100%);   /* ambre → corail */
+    --mix-danger: linear-gradient(135deg,#EF4444 0%,#F43F5E 100%);   /* rouges */
+    --ring:       0 0 0 .2rem rgba(60,95,164,.18);                   /* halo focus bleu */
+  }
+
+  /* Bandeau / entête de page */
+  .page-hero{
+    background: var(--mix-cool);
+    border-radius: var(--radius-xl);
+    color:#fff; position:relative; overflow:hidden;
+    padding: 1.25rem 1.1rem; margin-bottom: 1rem;
+    box-shadow: var(--shadow-lg);
+  }
+  .page-hero::after{
+    content:''; position:absolute; inset:auto 0 0 0; height:80px;
+    background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100" fill="rgba(255,255,255,0.12)"><polygon points="0,100 1000,100 1000,40 800,70 600,20 400,80 200,30 0,60"/></svg>') center/cover no-repeat;
+  }
+  .page-hero h2{ margin:0; font-weight:700 }
+  .page-hero .muted{ opacity:.95 }
+
+  /* Fil d'Ariane plus lisible */
+  .breadcrumb{
+    background: rgba(255,255,255,.8);
+    border-radius: var(--radius-md);
+    padding:.75rem 1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Légende des types (optionnelle) */
+  .type-legend .badge{
+    font-weight:600;
+    border-radius: 999px;
+    padding:.5rem .75rem;
+  }
+  .badge-cool   { background: var(--mix-cool);   color:#fff }
+  .badge-fresh  { background: var(--mix-fresh);  color:#fff }
+  .badge-warm   { background: var(--mix-warm);   color:#111827 }
+
+  /* Barres d’outils */
+  .toolbar{
+    display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;
+  }
+  .toolbar .search{
+    position:relative; flex:1; min-width:240px;
+  }
+  .toolbar .search .form-control{
+    padding-left: 2.3rem;
+  }
+  .toolbar .search .icon{
+    position:absolute; left:.75rem; top:50%; transform:translateY(-50%);
+    color: var(--text-secondary);
+  }
+
+  /* Titre de groupe (type) */
+  .group-title{
+    display:flex; align-items:center; justify-content:space-between;
+    margin: .25rem 0 .75rem; padding-bottom:.35rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .group-title h4{ margin:0; font-weight:700 }
+  .group-title .accent{
+    display:inline-block; height:6px; width:90px; border-radius:999px;
+  }
+  .accent.cool{  background: var(--mix-cool)  }
+  .accent.fresh{ background: var(--mix-fresh) }
+  .accent.warm{  background: var(--mix-warm)  }
+
+  /* Cartes catégories */
+  .category-card{
+    border-radius: var(--radius-lg);
+    background: rgba(255,255,255,.96);
+    border:1px solid rgba(0,0,0,.04);
+    box-shadow: var(--shadow-md);
+    overflow:hidden; position:relative;
+    transition: transform .28s ease, box-shadow .28s ease;
+  }
+  .category-card::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  }
+  .category-card.mix-cool::before{  background: var(--mix-cool) }
+  .category-card.mix-fresh::before{ background: var(--mix-fresh) }
+  .category-card.mix-warm::before{  background: var(--mix-warm) }
+
+  .category-card:hover{
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-xl);
+  }
+  .category-card .card-title{
+    display:flex; align-items:center; gap:.5rem;
+    font-weight:700; margin:0 0 .25rem 0;
+  }
+  .category-card .card-title .dot{
+    width:10px; height:10px; border-radius:50%;
+    background:#3C5FA4; opacity:.85;
+  }
+  .category-card .card-text{
+    min-height: 44px;
+  }
+
+  /* Inputs / buttons */
+  .form-select:focus, .form-control:focus{ box-shadow: var(--ring) !important; border-color:#3C5FA4 !important }
+  .btn-mix-cool{  background:var(--mix-cool);  color:#fff; border:none }
+  .btn-mix-fresh{ background:var(--mix-fresh); color:#fff; border:none }
+  .btn-mix-warm{  background:var(--mix-warm);  color:#111827; border:none }
+  .btn-mix-danger{background:var(--mix-danger);color:#fff; border:none }
+  .btn-outline-cool{
+    border:2px solid #3C5FA4; color:#3C5FA4; background:transparent;
+  }
+  .btn-outline-cool:hover{ background:var(--mix-cool); color:#fff; border-color:transparent }
+
+  /* Pied des actions */
+  .page-actions .btn{ min-width: 210px }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'index' %}">Accueil</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'project_selection' %}">Projets</a></li>
-                <li class="breadcrumb-item active">{{ projet.nom }}</li>
-            </ol>
-        </nav>
-        
-        <h2 class="mb-4">
-            <i class="fas fa-layer-group"></i> Sélection des Catégories
-        </h2>
-        <p class="text-muted">Projet: <strong>{{ projet.nom }}</strong>{% if projet.client %} - Client: <strong>{{ projet.client }}</strong>{% endif %}</p>
-    </div>
+
+<!-- Bandeau -->
+<div class="page-hero mb-3">
+  <nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'index' %}">Accueil</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'project_selection' %}">Projets</a></li>
+      <li class="breadcrumb-item active">{{ projet.nom }}</li>
+    </ol>
+  </nav>
+  <h2><i class="fas fa-layer-group me-2"></i> Sélection des Catégories</h2>
+  <div class="muted">
+    Projet : <strong>{{ projet.nom }}</strong>{% if projet.client %} — Client : <strong>{{ projet.client }}</strong>{% endif %}
+  </div>
 </div>
 
-<form method="post">
-    {% csrf_token %}
-    <div class="row">
-        {% for type_nom, categories in categories_groupees.items %}
-        <div class="col-12 mb-4">
-            <h4 class="border-bottom pb-2">{{ type_nom }}</h4>
-            <div class="row">
-                {% for categorie in categories %}
-<div class="col-md-6 col-lg-4 mb-3">
-    <div class="card category-card h-100 card-hover">
-        <div class="card-body">
-            <h6 class="card-title">
-                <!-- Icône existante -->
-                {{ categorie.nom }}
-            </h6>
-            <p class="card-text text-muted small">{{ categorie.description|default:"" }}</p>
-            
-            <!-- Si c'est la catégorie main d'œuvre tuyauterie -->
-            {% if categorie.nom == "Main d'œuvre Tuyauterie" or "tuyauterie" in categorie.nom|lower %}
-                <div class="btn-group w-100 mb-2">
-                    <button type="submit" name="categorie_id" value="{{ categorie.id }}"
-                            class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-list"></i> Éléments standards
-                    </button>
-                    <a href="{% url 'sablage_tuyauterie' categorie.id %}" 
-                       class="btn btn-outline-success btn-sm">
-                        <i class="fas fa-spray-can"></i> Sablage
-                    </a>
-                </div>
-            {% else %}
-                <button type="submit" name="categorie_id" value="{{ categorie.id }}"
-                        class="btn btn-outline-primary btn-sm w-100">
-                    <i class="fas fa-arrow-right"></i> Sélectionner
-                </button>
-            {% endif %}
-        </div>
-    </div>
+<!-- Outils : recherche rapide + légende -->
+<div class="toolbar mb-3">
+  <div class="search">
+    <i class="fas fa-search icon"></i>
+    <input type="text" id="searchCategory" class="form-control" placeholder="Rechercher une catégorie…">
+  </div>
+  <div class="type-legend d-flex gap-2">
+    <span class="badge badge-fresh">Main d'œuvre</span>
+    <span class="badge badge-cool">Discipline</span>
+    <span class="badge badge-warm">Équipements / Autres</span>
+  </div>
 </div>
-{% endfor %}
-            </div>
+
+<form method="post" id="categoriesForm">
+  {% csrf_token %}
+
+  <div class="row">
+    {% for type_nom, categories in categories_groupees.items %}
+      {% with type_lower=type_nom|lower %}
+      <div class="col-12 mb-3 group-block">
+        <div class="group-title">
+          <h4 class="mb-0">{{ type_nom }}</h4>
+          <span class="accent
+            {% if 'main' in type_lower %}fresh
+            {% elif 'discipline' in type_lower %}cool
+            {% else %}warm{% endif %}"></span>
         </div>
-        {% empty %}
-        <div class="col-12">
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i>
-                Aucune catégorie disponible pour le moment.
+
+        <div class="row">
+          {% for categorie in categories %}
+            {% with cat_lower=categorie.nom|lower %}
+            <div class="col-md-6 col-lg-4 mb-3 category-item"
+                 data-name="{{ categorie.nom|lower }}">
+              <div class="card category-card h-100 card-hover
+                {% if 'main' in type_lower %}mix-fresh
+                {% elif 'discipline' in type_lower %}mix-cool
+                {% else %}mix-warm{% endif %}">
+                <div class="card-body d-flex flex-column">
+                  <h6 class="card-title">
+                    <span class="dot"></span>
+                    {{ categorie.nom }}
+                  </h6>
+
+                  <p class="card-text text-muted small">
+                    {{ categorie.description|default:"" }}
+                  </p>
+
+                  <div class="mt-auto">
+                    {# Cas spécial : Main d'œuvre Tuyauterie #}
+                    {% if categorie.nom == "Main d'œuvre Tuyauterie" or "tuyauterie" in cat_lower %}
+                      <div class="d-flex gap-2">
+                        <button type="submit" name="categorie_id" value="{{ categorie.id }}"
+                                class="btn btn-outline-cool btn-sm flex-fill">
+                          <i class="fas fa-list"></i> Éléments standards
+                        </button>
+                        <a href="{% url 'sablage_tuyauterie' categorie.id %}"
+                           class="btn btn-mix-fresh btn-sm flex-fill">
+                          <i class="fas fa-spray-can"></i> Sablage
+                        </a>
+                      </div>
+                    {% else %}
+                      <button type="submit" name="categorie_id" value="{{ categorie.id }}"
+                              class="btn btn-mix-cool btn-sm w-100">
+                        <i class="fas fa-arrow-right"></i> Sélectionner
+                      </button>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
             </div>
+            {% endwith %}
+          {% endfor %}
         </div>
-        {% endfor %}
-    </div>
+      </div>
+      {% endwith %}
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-1"></i>
+          Aucune catégorie disponible pour le moment.
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 </form>
 
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between">
-            <a href="{% url 'project_selection' %}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Retour aux projets
-            </a>
-            <a href="{% url 'rapport_projet' projet.id %}" class="btn btn-success">
-                <i class="fas fa-file-alt"></i> Voir le rapport
-            </a>
-        </div>
+<!-- Actions de page -->
+<div class="row mt-3">
+  <div class="col-12">
+    <div class="d-flex justify-content-between page-actions">
+      <a href="{% url 'project_selection' %}" class="btn btn-outline-cool">
+        <i class="fas fa-arrow-left me-1"></i> Retour aux projets
+      </a>
+      <a href="{% url 'rapport_projet' projet.id %}" class="btn btn-mix-warm">
+        <i class="fas fa-file-alt me-1"></i> Voir le rapport
+      </a>
     </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  // Filtre client-side des catégories
+  const input = document.getElementById('searchCategory');
+  if(!input) return;
+  const items = document.querySelectorAll('.category-item');
+
+  function filter(q){
+    q = (q || '').toLowerCase().trim();
+    items.forEach(el=>{
+      const name = el.getAttribute('data-name') || '';
+      el.style.display = (!q || name.includes(q)) ? '' : 'none';
+    });
+  }
+  input.addEventListener('input', e=> filter(e.target.value));
+})();
+</script>
 {% endblock %}

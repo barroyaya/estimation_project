@@ -77,6 +77,13 @@ def category_selection(request):
     return render(request, 'client/category_selection.html', context)
 
 
+# imports en haut du fichier views.py (ajoute Unite)
+from .models import Projet, Categorie, Discipline, Element, EstimationElement, EstimationSummary, DemandeElement, Unite
+from django.db.models import Q
+from django.core.paginator import Paginator
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect, render
+
 def item_selection(request, categorie_id):
     """Sélection d'éléments dans une catégorie"""
     projet_id = request.session.get('projet_id')
@@ -90,7 +97,10 @@ def item_selection(request, categorie_id):
     search_query = request.GET.get('search', '')
     discipline_id = request.GET.get('discipline', '')
 
-    elements = Element.objects.filter(categorie=categorie, actif=True)
+    # ⚠️ Précharger discipline + unite (FK)
+    elements = (Element.objects
+                .filter(categorie=categorie, actif=True)
+                .select_related('discipline', 'unite'))
 
     if search_query:
         elements = elements.filter(
@@ -112,11 +122,11 @@ def item_selection(request, categorie_id):
         element__categorie=categorie
     ).values_list('element_id', flat=True)
 
-    # Récupérer les demandes personnalisées pour cette catégorie
-    demandes_personnalisees = DemandeElement.objects.filter(
-        projet=projet,
-        categorie=categorie
-    ).select_related('discipline').order_by('-date_demande')
+    # Récupérer les demandes personnalisées (⚠️ précharger unite aussi)
+    demandes_personnalisees = (DemandeElement.objects
+        .filter(projet=projet, categorie=categorie)
+        .select_related('discipline', 'unite')
+        .order_by('-date_demande'))
 
     disciplines = Discipline.objects.filter(
         id__in=elements.values_list('discipline_id', flat=True).distinct()
@@ -139,13 +149,14 @@ def item_selection(request, categorie_id):
             designation = request.POST.get('designation_personnalisee', '').strip()
             discipline_id = request.POST.get('discipline_personnalisee')
             caracteristiques = request.POST.get('caracteristiques_personnalisees', '').strip()
-            unite = request.POST.get('unite_personnalisee', 'u')
+            unite_code = request.POST.get('unite_personnalisee', 'u')  # ex: 'ml', 'm2', ...
             quantite = request.POST.get('quantite_personnalisee', 1)
 
             if designation and discipline_id:
                 try:
                     discipline = get_object_or_404(Discipline, id=discipline_id)
                     quantite_float = float(quantite) if quantite else 1.0
+                    unite_obj = Unite.objects.filter(code=unite_code).first() or Unite.objects.get(code='u')
 
                     DemandeElement.objects.create(
                         projet=projet,
@@ -153,7 +164,7 @@ def item_selection(request, categorie_id):
                         discipline=discipline,
                         designation=designation,
                         caracteristiques=caracteristiques,
-                        unite=unite,
+                        unite=unite_obj,  # ✅ FK, pas un code texte
                         quantite=quantite_float
                     )
 
@@ -162,7 +173,7 @@ def item_selection(request, categorie_id):
 
                 except (ValueError, TypeError):
                     messages.error(request, 'Veuillez entrer une quantité valide.')
-                except Exception as e:
+                except Exception:
                     messages.error(request, 'Une erreur est survenue lors de l\'envoi de votre demande.')
             else:
                 messages.error(request, 'Veuillez remplir tous les champs obligatoires (désignation et discipline).')
@@ -174,13 +185,11 @@ def item_selection(request, categorie_id):
 
             if element_ids:
                 try:
-                    # Supprimer les anciens éléments de cette catégorie
                     EstimationElement.objects.filter(
                         projet=projet,
                         element__categorie=categorie
                     ).delete()
 
-                    # Ajouter les nouveaux éléments
                     elements_ajoutes = 0
                     for i, element_id in enumerate(element_ids):
                         if element_id:
@@ -194,14 +203,13 @@ def item_selection(request, categorie_id):
                             )
                             elements_ajoutes += 1
 
-                    # Mettre à jour le résumé
-                    summary, created = EstimationSummary.objects.get_or_create(projet=projet)
+                    summary, _ = EstimationSummary.objects.get_or_create(projet=projet)
                     summary.calculer_totaux()
 
                     messages.success(request, f'{elements_ajoutes} élément(s) ajouté(s) à votre estimation!')
                     return redirect('category_selection')
 
-                except (Element.DoesNotExist, ValueError) as e:
+                except (Element.DoesNotExist, ValueError):
                     messages.error(request, 'Erreur lors de l\'ajout des éléments. Veuillez réessayer.')
             else:
                 messages.warning(request, 'Aucun élément sélectionné.')
@@ -551,89 +559,119 @@ import datetime
 # estimation/views.py - Corrections pour inclure le sablage temporaire dans les exports
 
 def export_pdf_reportlab(request, projet_id):
-    """Export PDF avec sablage temporaire inclus"""
+    """Export PDF avec sablage + colonnes Caractéristiques & Unité adaptées"""
+    # --- Imports locaux (auto-contenu) ---
+    import os, re, datetime
+    from io import BytesIO
+    from decimal import Decimal
+    from xml.sax.saxutils import escape as xml_escape
+
+    from django.conf import settings
+    from django.shortcuts import get_object_or_404
+    from django.http import HttpResponse
+
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import inch
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Table, TableStyle, Image, Spacer
+    )
+
+    # --- Données projet ---
     projet = get_object_or_404(Projet, id=projet_id)
 
-    # Récupérer les données
+    def format_caracteristiques(text, max_length=80):
+        if not text or len(text) <= max_length:
+            return text or '-'
+        truncated = text[:max_length - 3].rsplit(' ', 1)[0] + '...'
+        return truncated
+
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle', parent=styles['Heading1'],
+        fontSize=18, spaceAfter=30, alignment=1, textColor=colors.HexColor('#667eea')
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading', parent=styles['Heading2'],
+        fontSize=14, spaceAfter=12, textColor=colors.HexColor('#333333')
+    )
+    carac_para_style = ParagraphStyle(
+        'CaracCell', parent=styles['Normal'],
+        fontSize=9, leading=12, spaceBefore=0, spaceAfter=0
+    )
+    unit_para_style = ParagraphStyle(  # <<< NOUVEAU : pour la colonne Unité
+        'UnitCell', parent=styles['Normal'],
+        fontSize=9, leading=11, alignment=1  # 1 = center
+    )
+
+    def caracs_paragraph(text: str) -> Paragraph:
+        if not text:
+            return Paragraph('-', carac_para_style)
+        parts = re.split(r'\s*-\s*|;\s*', text.strip())
+        pretty = '<br/>'.join(f'• {xml_escape(p)}' for p in parts if p)
+        return Paragraph(pretty, carac_para_style)
+
+    def unit_paragraph(text: str) -> Paragraph:
+        return Paragraph(xml_escape(text or '-'), unit_para_style)
+
+    # --- Récupération données ---
     elements_selections = EstimationElement.objects.filter(projet=projet).select_related(
         'element', 'element__categorie', 'element__discipline'
     )
     demandes_approuvees = DemandeElement.objects.filter(projet=projet, statut='approuve')
 
-    # NOUVEAU : Récupérer le sablage temporaire de la session
     elements_sablage_temp = request.session.get('elements_sablage', [])
-    PRIX_SABLAGE_M2 = 5000  # Prix au m²
+    PRIX_SABLAGE_M2 = 5000
 
-    # Organiser par catégorie
     elements_par_categorie = {}
 
-    # Traiter les éléments standards
     for selection in elements_selections:
-        if selection.element:  # Éléments standards
+        if selection.element:
             cat_nom = selection.element.categorie.nom
             if cat_nom not in elements_par_categorie:
                 elements_par_categorie[cat_nom] = {
                     'categorie': selection.element.categorie,
-                    'elements': [],
-                    'demandes_approuvees': [],
-                    'elements_sablage': [],
-                    'total': 0
+                    'elements': [], 'demandes_approuvees': [],
+                    'elements_sablage': [], 'total': 0
                 }
             elements_par_categorie[cat_nom]['elements'].append(selection)
             elements_par_categorie[cat_nom]['total'] += selection.cout_total
         else:
-            # Éléments de sablage validés
             cat_nom = "Main d'œuvre Tuyauterie"
             if cat_nom not in elements_par_categorie:
                 try:
-                    categorie_mo = Categorie.objects.filter(
-                        type_categorie="main_oeuvre"
-                    ).first()
+                    categorie_mo = Categorie.objects.filter(type_categorie="main_oeuvre").first()
                 except Categorie.DoesNotExist:
                     categorie_mo = type('TempCategorie', (), {
-                        'nom': 'Main d\'œuvre Tuyauterie',
-                        'type_categorie': 'main_oeuvre'
+                        'nom': "Main d'œuvre Tuyauterie", 'type_categorie': 'main_oeuvre'
                     })()
-
                 elements_par_categorie[cat_nom] = {
                     'categorie': categorie_mo,
-                    'elements': [],
-                    'demandes_approuvees': [],
-                    'elements_sablage': [],
-                    'total': 0
+                    'elements': [], 'demandes_approuvees': [],
+                    'elements_sablage': [], 'total': 0
                 }
-
             elements_par_categorie[cat_nom]['elements_sablage'].append(selection)
             elements_par_categorie[cat_nom]['total'] += selection.cout_total
 
-    # NOUVEAU : Ajouter le sablage temporaire
     if elements_sablage_temp:
         cat_nom = "Main d'œuvre Tuyauterie"
-
         if cat_nom not in elements_par_categorie:
             try:
                 categorie_mo = Categorie.objects.filter(type_categorie="main_oeuvre").first()
             except Categorie.DoesNotExist:
                 categorie_mo = type('TempCategorie', (), {
-                    'nom': 'Main d\'œuvre Tuyauterie',
-                    'type_categorie': 'main_oeuvre'
+                    'nom': "Main d'œuvre Tuyauterie", 'type_categorie': 'main_oeuvre'
                 })()
-
             elements_par_categorie[cat_nom] = {
                 'categorie': categorie_mo,
-                'elements': [],
-                'demandes_approuvees': [],
-                'elements_sablage': [],
-                'elements_sablage_temp': [],
-                'total': 0
+                'elements': [], 'demandes_approuvees': [],
+                'elements_sablage': [], 'elements_sablage_temp': [], 'total': 0
             }
 
-        # Calculer le total du sablage temporaire
-        from decimal import Decimal
         surface_globale_temp = sum(elem['surface_totale'] for elem in elements_sablage_temp)
         prix_total_temp = Decimal(str(surface_globale_temp * PRIX_SABLAGE_M2))
-
-        # Ajouter les informations temporaires
         elements_par_categorie[cat_nom]['elements_sablage_temp'] = {
             'elements': elements_sablage_temp,
             'surface_globale': surface_globale_temp,
@@ -643,70 +681,40 @@ def export_pdf_reportlab(request, projet_id):
         }
         elements_par_categorie[cat_nom]['total'] += prix_total_temp
 
-    # Ajouter demandes personnalisées approuvées
     for demande in demandes_approuvees:
         cat_nom = demande.categorie.nom
         if cat_nom not in elements_par_categorie:
             elements_par_categorie[cat_nom] = {
                 'categorie': demande.categorie,
-                'elements': [],
-                'demandes_approuvees': [],
-                'elements_sablage': [],
-                'total': 0
+                'elements': [], 'demandes_approuvees': [],
+                'elements_sablage': [], 'total': 0
             }
         elements_par_categorie[cat_nom]['demandes_approuvees'].append(demande)
         elements_par_categorie[cat_nom]['total'] += demande.cout_total
 
-    # Recalculer le résumé en incluant le sablage temporaire
     try:
         summary = EstimationSummary.objects.get(projet=projet)
         summary.calculer_totaux()
-
-        # Ajouter le sablage temporaire au total
         if elements_sablage_temp:
-            from decimal import Decimal
             surface_globale_temp = sum(elem['surface_totale'] for elem in elements_sablage_temp)
             prix_sablage_temp = Decimal(str(surface_globale_temp * PRIX_SABLAGE_M2))
             summary.cout_total_main_oeuvre += prix_sablage_temp
             summary.cout_total_ht += prix_sablage_temp
             summary.tva_montant = summary.cout_total_ht * (summary.tva_taux / Decimal('100'))
             summary.cout_total_ttc = summary.cout_total_ht + summary.tva_montant
-
     except EstimationSummary.DoesNotExist:
         summary = EstimationSummary.objects.create(projet=projet)
         summary.calculer_totaux()
 
-    # Créer le PDF
+    # --- PDF ---
     response = HttpResponse(content_type='application/pdf')
     nom_fichier_securise = "".join(c for c in projet.nom if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    response[
-        'Content-Disposition'] = f'attachment; filename="rapport_{nom_fichier_securise}_{datetime.date.today()}.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="rapport_{nom_fichier_securise}_{datetime.date.today()}.pdf"'
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
-
-    # Styles
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=30,
-        alignment=1,
-        textColor=colors.HexColor('#667eea')
-    )
-
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=14,
-        spaceAfter=12,
-        textColor=colors.HexColor('#333333')
-    )
-
     story = []
 
-    # Logo et en-tête
     logo_path = os.path.join(settings.STATIC_ROOT or settings.BASE_DIR, 'static', 'img', 'logo.jpg')
     if os.path.exists(logo_path):
         try:
@@ -714,170 +722,159 @@ def export_pdf_reportlab(request, projet_id):
             logo_img.hAlign = 'CENTER'
             story.append(logo_img)
             story.append(Spacer(1, 20))
-        except Exception as e:
-            print(f"Erreur lors du chargement du logo: {e}")
+        except Exception:
+            pass
 
-    company_info = Paragraph(
-        "<b>VOTRE ENTREPRISE</b><br/>"
-        "Adresse de l'entreprise<br/>"
-        "Téléphone - Email",
-        styles['Normal']
-    )
-    company_info.hAlign = 'CENTER'
-    story.append(company_info)
+    story.append(Paragraph("<b>VOTRE ENTREPRISE</b><br/>Adresse de l'entreprise<br/>Téléphone - Email", styles['Normal']))
     story.append(Spacer(1, 20))
-
-    # Titre principal
-    title = Paragraph(f"RAPPORT D'ESTIMATION<br/>Projet: {projet.nom}", title_style)
-    story.append(title)
-
+    story.append(Paragraph(f"RAPPORT D'ESTIMATION<br/>Projet: {projet.nom}", title_style))
     if projet.client:
-        client_para = Paragraph(f"Client: <b>{projet.client}</b>", styles['Normal'])
-        story.append(client_para)
-
-    date_para = Paragraph(f"Date: {datetime.date.today().strftime('%d/%m/%Y')}", styles['Normal'])
-    story.append(date_para)
+        story.append(Paragraph(f"Client: <b>{projet.client}</b>", styles['Normal']))
+    story.append(Paragraph(f"Date: {datetime.date.today().strftime('%d/%m/%Y')}", styles['Normal']))
     story.append(Spacer(1, 20))
 
-    # Tableau par catégorie
+    # --- Tableaux par catégorie ---
     for categorie_nom, data in elements_par_categorie.items():
-        cat_title = Paragraph(f"{categorie_nom} - Total: {data['total']:,.2f} CFA", heading_style)
-        story.append(cat_title)
+        story.append(Paragraph(f"{categorie_nom} - Total: {data['total']:,.2f} CFA", heading_style))
 
-        table_data = [
-            ['Désignation', 'Caractéristiques', 'Prix Unit.', 'Qté', 'Unité', 'Total']
-        ]
+        table_data = [['Désignation', 'Caractéristiques', 'Prix Unit.', 'Qté', 'Unité', 'Total']]
 
         # Éléments standards
         for element in data['elements']:
             table_data.append([
                 element.designation,
-                element.caracteristiques or '-',
+                caracs_paragraph(element.caracteristiques),
                 f"{element.prix_unitaire_utilise:,.2f}",
                 f"{element.quantite:,.2f}",
-                element.unite_display,
+                unit_paragraph(element.unite_display),    # <<< Paragraph + wrap
                 f"{element.cout_total:,.2f}"
             ])
 
-        # Éléments de sablage validés
+        # Sablage validé
         for element_sablage in data['elements_sablage']:
+            sablage_para = Paragraph(xml_escape(f"Surface: {element_sablage.quantite:.3f} m²"), carac_para_style)
             table_data.append([
                 "Sablage Tuyauterie",
-                f"Surface: {element_sablage.quantite:.3f} m²",
+                sablage_para,
                 f"{element_sablage.prix_unitaire_utilise:,.2f}",
                 f"{element_sablage.quantite:,.3f}",
-                "m²",
+                unit_paragraph("m²"),
                 f"{element_sablage.cout_total:,.2f}"
             ])
 
-        # NOUVEAU : Sablage temporaire
-        if 'elements_sablage_temp' in data and data['elements_sablage_temp']:
+        # Sablage temporaire
+        if data.get('elements_sablage_temp'):
             sablage_temp = data['elements_sablage_temp']
-
-            # Créer un résumé des éléments temporaires (optimisé pour PDF)
-            elements_resume = []
-            for elem in sablage_temp['elements']:
-                elements_resume.append(f"{elem['nom_type_piece']} {elem['nom_dn']} ({elem['quantite']:g})")
-
-            # Diviser le texte en plusieurs lignes si trop long
+            elements_resume = [f"{e['nom_type_piece']} {e['nom_dn']} ({e['quantite']:g})" for e in sablage_temp['elements']]
             resume_text = ", ".join(elements_resume)
-            if len(resume_text) > 60:  # Si le texte est trop long
-                # Diviser en lignes de maximum 60 caractères
+            if len(resume_text) > 80:
                 words = resume_text.split(', ')
-                lines = []
-                current_line = ""
-
-                for word in words:
-                    if len(current_line + word) <= 60:
-                        current_line += word + ", " if current_line else word
-                    else:
-                        if current_line:
-                            lines.append(current_line.rstrip(', '))
-                        current_line = word
-
-                if current_line:
-                    lines.append(current_line.rstrip(', '))
-
-                resume_final = "\n".join(lines)
+                lines, cur = [], ""
+                for w in words:
+                    if len(cur + w) <= 80: cur += ("" if not cur else ", ") + w
+                    else: lines.append(cur); cur = w
+                if cur: lines.append(cur)
+                resume_final = "<br/>".join(xml_escape(l) for l in lines)
             else:
-                resume_final = resume_text
+                resume_final = xml_escape(resume_text)
 
-            caracteristiques_sablage = f"Surface: {sablage_temp['surface_globale']:.3f} m²\nDétail: {resume_final}"
-
+            sablage_temp_para = Paragraph(
+                f"Surface: {sablage_temp['surface_globale']:.3f} m²<br/>Détail: {resume_final}",
+                carac_para_style
+            )
             table_data.append([
                 "Sablage Tuyauterie",
-                caracteristiques_sablage,
+                sablage_temp_para,
                 f"{sablage_temp['prix_unitaire']:,.2f}",
                 f"{sablage_temp['surface_globale']:,.3f}",
-                "m²",
+                unit_paragraph("m²"),
                 f"{sablage_temp['prix_total']:,.2f}"
             ])
 
-        # Éléments personnalisés
+        # Demandes perso
         for demande in data['demandes_approuvees']:
             table_data.append([
                 f"{demande.designation} (Personnalisé)",
-                demande.caracteristiques or '-',
+                caracs_paragraph(demande.caracteristiques),
                 f"{demande.prix_unitaire_admin:,.2f}",
                 f"{demande.quantite:,.2f}",
-                demande.get_unite_display(),
+                unit_paragraph(demande.get_unite_display()),
                 f"{demande.cout_total:,.2f}"
             ])
 
-        # Vérifier s'il y a des éléments de sablage pour ajuster les largeurs
-        has_sablage = any('Sablage' in str(row[0]) for row in table_data[1:])
+        # Largeurs : Unité plus large (évite le débordement)
+        is_materiel = (
+            getattr(data['categorie'], 'type_categorie', '') == 'materiel' or
+            'Matériel' in categorie_nom or 'Materiel' in categorie_nom
+        )
+        has_sablage = any('Sablage' in str(r[0]) for r in table_data[1:])
 
-        if has_sablage:
-            # Largeurs ajustées pour accommoder le sablage (colonne caractéristiques plus large)
-            colWidths = [2.0 * inch, 2.2 * inch, 0.8 * inch, 0.6 * inch, 0.6 * inch, 0.8 * inch]
+        if is_materiel:
+            colWidths = [1.6 * inch, 3.3 * inch, 0.85 * inch, 0.60 * inch, 1.05 * inch, 0.85 * inch]
+        elif has_sablage:
+            colWidths = [1.6 * inch, 3.0 * inch, 0.80 * inch, 0.55 * inch, 0.90 * inch, 0.85 * inch]
         else:
-            # Largeurs normales
-            colWidths = [2.2 * inch, 1.5 * inch, 1 * inch, 0.7 * inch, 0.8 * inch, 1 * inch]
+            colWidths = [1.8 * inch, 2.7 * inch, 0.80 * inch, 0.55 * inch, 0.90 * inch, 0.75 * inch]
 
         table = Table(table_data, colWidths=colWidths)
 
-        # Style de base
+        # Styles
         table_style = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
+
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Alignement vertical en haut
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+
+            # Alignements COLONNE par COLONNE (plus de "tout à droite")
+            ('ALIGN', (0, 0), (1, -1), 'LEFT'),   # Désignation, Caractéristiques
+            ('ALIGN', (2, 0), (2, -1), 'RIGHT'),  # Prix Unit.
+            ('ALIGN', (3, 0), (3, -1), 'RIGHT'),  # Qté
+            ('ALIGN', (4, 0), (4, -1), 'CENTER'), # Unité
+            ('ALIGN', (5, 0), (5, -1), 'RIGHT'),  # Total
+
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('WORDWRAP', (0, 0), (-1, -1), 'LTR'),
         ]
 
-        # Ajuster spécifiquement les lignes de sablage
-        for i, row in enumerate(table_data[1:], 1):  # Commencer à 1 pour ignorer l'en-tête
+        # Épaisseur supplémentaire pour Caractéristiques des Matériels
+        if is_materiel:
+            table_style.extend([
+                ('TOPPADDING',    (1, 1), (1, -1), 8),
+                ('BOTTOMPADDING', (1, 1), (1, -1), 8),
+                ('LEFTPADDING',   (1, 1), (1, -1), 6),
+                ('RIGHTPADDING',  (1, 1), (1, -1), 6),
+                ('FONTSIZE',      (1, 1), (1, -1), 9),
+            ])
+
+        # Style Sablage
+        for i, row in enumerate(table_data[1:], 1):
             if 'Sablage' in str(row[0]):
-                # Style spécial pour les lignes de sablage
                 table_style.extend([
-                    ('FONTSIZE', (0, i), (-1, i), 7),  # Police plus petite
+                    ('FONTSIZE', (0, i), (-1, i), 7),
                     ('TOPPADDING', (0, i), (-1, i), 8),
                     ('BOTTOMPADDING', (0, i), (-1, i), 8),
-                    ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FFF3CD')),  # Fond jaune clair
+                    ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#FFF3CD')),
                 ])
 
         table.setStyle(TableStyle(table_style))
-
         story.append(table)
         story.append(Spacer(1, 20))
 
-    # Résumé financier
+    # --- Résumé financier ---
     story.append(Paragraph("RÉSUMÉ FINANCIER", heading_style))
-
     financial_data = [
         ['Sous-total HT', f"{summary.cout_total_ht:,.2f} CFA"],
-        [f'TVA ({summary.tva_taux}%)', f"{summary.tva_montant:,.2f} CFA"],
-        ['TOTAL TTC', f"{summary.cout_total_ttc:,.2f} CFA"]
+        [f"TVA ({summary.tva_taux}%)", f"{summary.tva_montant:,.2f} CFA"],
+        ['TOTAL TTC', f"{summary.cout_total_ttc:,.2f} CFA"],
     ]
-
     financial_table = Table(financial_data, colWidths=[3 * inch, 2 * inch])
     financial_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
@@ -890,32 +887,28 @@ def export_pdf_reportlab(request, projet_id):
         ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
     ]))
-
     story.append(financial_table)
 
-    # Note sur le sablage temporaire
     if elements_sablage_temp:
         story.append(Spacer(1, 15))
         note_sablage = Paragraph(
-            f"<i>Note: Ce rapport inclut {len(elements_sablage_temp)} élément(s) de sablage temporaire pour un total de {sum(elem['surface_totale'] for elem in elements_sablage_temp):.3f} m²</i>",
+            f"<i>Note : Ce rapport inclut {len(elements_sablage_temp)} élément(s) de sablage temporaire pour un total de "
+            f"{sum(elem['surface_totale'] for elem in elements_sablage_temp):.3f} m²</i>",
             styles['Normal']
         )
         story.append(note_sablage)
 
-    # Pied de page
     story.append(Spacer(1, 30))
-    footer_info = Paragraph(
-        f"<i>Rapport d'estimation généré pour le projet \"{projet.nom}\" le {datetime.date.today().strftime('%d/%m/%Y')}</i>",
-        styles['Normal']
-    )
-    footer_info.hAlign = 'CENTER'
-    story.append(footer_info)
+    story.append(Paragraph(
+        f"<i>Rapport d'estimation généré pour le projet \"{projet.nom}\" le "
+        f"{datetime.date.today().strftime('%d/%m/%Y')}</i>", styles['Normal']
+    ))
 
+    # Build & réponse
     doc.build(story)
     pdf = buffer.getvalue()
     buffer.close()
     response.write(pdf)
-
     return response
 
 
@@ -2125,3 +2118,31 @@ class ClientMiddleware:
 
         response = self.get_response(request)
         return response
+
+# imports nécessaires en haut du fichier
+from django.views.decorators.http import require_POST
+from django.db import transaction
+
+@client_required
+@require_POST
+def supprimer_projet(request, projet_id):
+    """Permet au client connecté de supprimer un de ses projets."""
+    client_id = request.session.get('client_id')
+    projet = get_object_or_404(Projet, id=projet_id, client_id=client_id)
+
+    nom = projet.nom
+    with transaction.atomic():
+        # OPTION A — suppression définitive (cascade sur EstimationElement, DemandeElement, EstimationSummary, etc.)
+        projet.delete()
+
+        # OPTION B — "archivage" (soft delete). Si tu préfères, remplace les 2 lignes au-dessus par :
+        # projet.actif = False
+        # projet.save(update_fields=['actif'])
+
+        # nettoyer la session si le projet supprimé était sélectionné
+        if request.session.get('projet_id') == projet_id:
+            request.session.pop('projet_id', None)
+            request.session.pop('elements_sablage', None)
+
+    messages.success(request, f'Le projet "{nom}" a été supprimé.')
+    return redirect('project_selection')

@@ -1,16 +1,20 @@
+# estimation/admin.py
+
 from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 from django.urls import reverse
-from django.http import HttpResponseRedirect
-from .models import *
+from .models import (
+    Projet, Client, Categorie, Discipline,
+    Unite, Element, DemandeElement, EstimationElement, EstimationSummary
+)
 
 
 @admin.register(Projet)
 class ProjetAdmin(admin.ModelAdmin):
     list_display = ['nom', 'client', 'date_creation', 'actif', 'actions_projet']
     list_filter = ['actif', 'date_creation']
-    search_fields = ['nom', 'client']
+    search_fields = ['nom', 'client__nom']
     readonly_fields = ['date_creation']
 
     def actions_projet(self, obj):
@@ -18,7 +22,6 @@ class ProjetAdmin(admin.ModelAdmin):
             '<a class="button" href="{}">Voir estimation</a>',
             reverse('rapport_projet', args=[obj.pk])
         )
-
     actions_projet.short_description = "Actions"
 
 
@@ -35,12 +38,15 @@ class DisciplineAdmin(admin.ModelAdmin):
     search_fields = ['nom', 'code']
 
     def couleur_preview(self, obj):
-        return format_html(
-            '<div style="width: 30px; height: 20px; background-color: {};"></div>',
-            obj.couleur
-        )
-
+        return format_html('<div style="width: 30px; height: 20px; background-color: {};"></div>', obj.couleur)
     couleur_preview.short_description = "Couleur"
+
+
+@admin.register(Unite)
+class UniteAdmin(admin.ModelAdmin):
+    list_display = ["libelle", "code", "symbole", "is_active"]
+    list_filter = ["is_active"]
+    search_fields = ["libelle", "code", "symbole"]
 
 
 @admin.register(Element)
@@ -50,52 +56,42 @@ class ElementAdmin(admin.ModelAdmin):
     search_fields = ['designation', 'numero', 'caracteristiques']
     list_editable = ['prix_unitaire', 'actif']
 
+    # ✅ affiche le widget lié avec bouton “+”
+    autocomplete_fields = ['unite', 'categorie', 'discipline']
+
     fieldsets = (
-        ('Informations générales', {
-            'fields': ('numero', 'designation', 'caracteristiques')
-        }),
-        ('Prix et unité', {
-            'fields': ('prix_unitaire', 'unite')
-        }),
-        ('Classification', {
-            'fields': ('categorie', 'discipline')
-        }),
-        ('Statut', {
-            'fields': ('actif',)
-        }),
+        ('Informations générales', {'fields': ('numero', 'designation', 'caracteristiques')}),
+        ('Prix et unité',          {'fields': ('prix_unitaire', 'unite')}),
+        ('Classification',         {'fields': ('categorie', 'discipline')}),
+        ('Statut',                 {'fields': ('actif',)}),
     )
 
 
 @admin.register(DemandeElement)
 class DemandeElementAdmin(admin.ModelAdmin):
-    list_display = ['designation', 'projet', 'categorie', 'statut', 'prix_unitaire_admin', 'date_demande',
-                    'actions_demande']
+    list_display = ['designation', 'projet', 'categorie', 'statut', 'prix_unitaire_admin', 'date_demande', 'actions_demande']
     list_filter = ['statut', 'categorie', 'discipline', 'date_demande']
     search_fields = ['designation', 'caracteristiques', 'projet__nom']
     readonly_fields = ['date_demande', 'projet', 'categorie', 'discipline']
-    list_editable = ['prix_unitaire_admin']
+
+    # ✅ bouton “+” aussi ici
+    autocomplete_fields = ['unite', 'projet', 'categorie', 'discipline']
 
     fieldsets = (
-        ('Informations de la demande', {
-            'fields': ('projet', 'categorie', 'discipline', 'date_demande')
-        }),
-        ('Élément demandé', {
-            'fields': ('designation', 'caracteristiques', 'unite', 'quantite')
-        }),
-        ('Validation administrateur', {
-            'fields': ('statut', 'prix_unitaire_admin', 'commentaire_admin', 'date_validation')
-        }),
+        ('Informations de la demande', {'fields': ('projet', 'categorie', 'discipline', 'date_demande')}),
+        ('Élément demandé',            {'fields': ('designation', 'caracteristiques', 'unite', 'quantite')}),
+        ('Validation administrateur',  {'fields': ('statut', 'prix_unitaire_admin', 'commentaire_admin', 'date_validation')}),
     )
 
     def actions_demande(self, obj):
         if obj.statut == 'en_attente':
             return format_html(
-                '<a class="button" href="javascript:void(0)" onclick="approuverDemande({})">Approuver</a> '
-                '<a class="button" href="javascript:void(0)" onclick="rejeterDemande({})">Rejeter</a>',
-                obj.id, obj.id
+                '<a class="button" href="{}?statut=approuve">Approuver</a> '
+                '<a class="button" href="{}?statut=rejete">Rejeter</a>',
+                reverse('admin:estimation_demandeelement_change', args=[obj.pk]),
+                reverse('admin:estimation_demandeelement_change', args=[obj.pk]),
             )
         return obj.get_statut_display()
-
     actions_demande.short_description = "Actions"
 
     def save_model(self, request, obj, form, change):
@@ -114,7 +110,6 @@ class DemandeElementAdmin(admin.ModelAdmin):
                 demande.save()
                 count += 1
         self.message_user(request, f"{count} demande(s) approuvée(s).")
-
     approuver_demandes.short_description = "Approuver les demandes sélectionnées"
 
     def rejeter_demandes(self, request, queryset):
@@ -126,7 +121,6 @@ class DemandeElementAdmin(admin.ModelAdmin):
                 demande.save()
                 count += 1
         self.message_user(request, f"{count} demande(s) rejetée(s).")
-
     rejeter_demandes.short_description = "Rejeter les demandes sélectionnées"
 
 
@@ -137,7 +131,6 @@ class EstimationElementInline(admin.TabularInline):
 
     def cout_total_display(self, obj):
         return f"{obj.cout_total:,.2f} CFA"
-
     cout_total_display.short_description = "Coût total"
 
     def type_element(self, obj):
@@ -146,7 +139,6 @@ class EstimationElementInline(admin.TabularInline):
         elif obj.demande_element:
             return f"Personnalisé ({obj.demande_element.get_statut_display()})"
         return "Inconnu"
-
     type_element.short_description = "Type"
 
 
@@ -158,7 +150,6 @@ class EstimationElementAdmin(admin.ModelAdmin):
 
     def cout_total_display(self, obj):
         return f"{obj.cout_total:,.2f} CFA"
-
     cout_total_display.short_description = "Coût total"
 
 
@@ -174,20 +165,10 @@ class EstimationSummaryAdmin(admin.ModelAdmin):
 
     def cout_total_ttc_display(self, obj):
         return f"{obj.cout_total_ttc:,.2f} CFA"
-
     cout_total_ttc_display.short_description = "Total TTC"
 
-    actions = ['recalculer_totaux']
 
-    def recalculer_totaux(self, request, queryset):
-        for summary in queryset:
-            summary.calculer_totaux()
-        self.message_user(request, "Totaux recalculés avec succès.")
-
-    recalculer_totaux.short_description = "Recalculer les totaux"
-
-
-# Configuration du site admin
+# Titres du site admin
 admin.site.site_header = "Administration - Système d'Estimation"
 admin.site.site_title = "Estimation Admin"
 admin.site.index_title = "Gestion des Projets d'Estimation"

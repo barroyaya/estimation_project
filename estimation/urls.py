@@ -26,5 +26,6 @@ urlpatterns = [
 
     path('sablage-tuyauterie/<int:categorie_id>/', views.sablage_tuyauterie, name='sablage_tuyauterie'),
     path('ajax/calculer-surface-sablage/', views.ajax_calculer_surface_sablage, name='ajax_calculer_surface_sablage'),
+    path("projets/<int:projet_id>/supprimer/", views.supprimer_projet, name="supprimer_projet"),
 
 ]
