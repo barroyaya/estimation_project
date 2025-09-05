@@ -25,8 +25,18 @@ SECRET_KEY = 'django-insecure-gg^c1aa3&b8q7i)n0)4fehai_!_@$&3t8*^f*#%mxp9$vi835z
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'estimation-project.onrender.com',
 
+
+]
+
+# Si vous déployez sur HTTPS (Render l’est), ajoutez-le ici :
+CSRF_TRUSTED_ORIGINS = [
+    'https://estimation-project.onrender.com'
+]
 
 # Application definition
 
